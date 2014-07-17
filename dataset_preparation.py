@@ -242,6 +242,34 @@ class QueryFinder:
 		#make it accessible
 		self.lookup_table = d
 
+def session_bag_of_words_generator():
+	"""A generator that yields strings containing every search
+	keyword the user made in that session"""
+	
+	#create Query Lookup Table
+	q = QueryFinder(0) #zero for all days
+	
+	#get browsing data
+	dbloc = find_repositories_on_computer()
+	dbloc = [x for x in dbloc if "Test" in x][0]
+	sessions = sessionized_visit_group_generator(dbloc)
+	
+	for session in sessions:
+		queries = [] #similar code to test_sessionizer_with_queries
+		for url in session:
+			up = urlparse.urlparse(url[0])
+			if up.netloc in q.lookup_table:
+				for get_var, value in urlparse.parse_qs(up.query).iteritems():
+					if get_var in q.lookup_table[up.netloc]:
+						#dedupe runs
+						if queries == []:
+							queries.append(value[0])
+						else:
+							if value[0] != queries[-1]:
+								queries.append(value[0])
+		queries = "\n".join(queries)
+		yield queries
+
 def test_search_scanner():
 	"""Scans for search variables"""
 	dbloc = find_repositories_on_computer()
@@ -295,7 +323,6 @@ def test_sessionizer_with_queries():
 						for x in value[0].split():
 							words[x] += 1
 		words = sorted(words.items(), key=lambda x: x[1], reverse=True)
-		words = words[:5]#now get top 5?
 		
 		#get time info etc
 		start = session[0][2]
@@ -304,7 +331,7 @@ def test_sessionizer_with_queries():
 		date = epoch_to_day(session[-1][2]/1000000) #of last item
 		total_pages_viewed = len(session)
 		#output
-		print "{0}\t{1} minutes\t{2} page views\tqueries: {3}...".format(date, duration, total_pages_viewed, words)
+		print "{0}\t{1} minutes\t{2} page views\t{3} words: {4}...".format(date, duration, total_pages_viewed, len(words), words[:5])
 
 
 
