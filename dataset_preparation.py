@@ -190,6 +190,8 @@ def sessionized_visit_group_generator(db_location):
 				yield to_yield
 			else:
 				urls.append(next_url)
+		else:
+			break
 	conn.close()
 
 def epoch_to_day(epoch):
