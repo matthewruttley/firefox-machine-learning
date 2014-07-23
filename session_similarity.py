@@ -43,19 +43,19 @@ class SessionGraph:
 		#gather data
 		sessions = [x for x in sessions] #load all from the generator
 		vocabulary = Vocab(sessions)
-		session_vectors = [[n, SessionVector(x, vocabulary.lookup_table)] for n, x in enumerate(sessions)]
+		session_vectors = [[n, SessionVector(x, vocabulary)] for n, x in enumerate(sessions)]
 		
 		#input data to the graph object
 		g = nx.Graph()
-		g.add_nodes_from(session_vectors)
+		g.add_nodes_from([x[0] for x in session_vectors])
 		
 		#iterate through nodes
 		for x in range(len(g.nodes())-1):
-			if tuple(sorted(x, x+1)) not in g.edges(): #has to be a better way to check edge existence
+			if tuple(sorted((x, x+1))) not in g.edges(): #has to be a better way to check edge existence
 														#, or is this even necessary given x, x+1 iterations?
 				#calculate the weight as the cosine similarity
-				sc = cosine(session_vectors[x], session_vectors[x+1])
-				g.add_weighted_edges_from([x, x+1])
+				sc = cosine(session_vectors[x][1].vector, session_vectors[x+1][1].vector)
+				g.add_weighted_edges_from([[x, x+1, sc]])
 		
 		self.graph = g
 		
@@ -82,7 +82,6 @@ def test_session_vectors():
 	for session in sessions:
 		x = SessionVector(session, v)
 		print str(x.vector)[:100]
-	
 
 def test_graph_output():
 	"""Run this to output a graph of all sessions"""
