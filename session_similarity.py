@@ -30,11 +30,10 @@ class SessionVector:
 	"""A sparse vector per session"""
 	def __init__(self, session, vocabulary):
 		#create a frequency table
-		d = defaultdict(int)
-		for session in sessions:
-			session = session.split() #tokenize
-			for word in session:
-				v[vocabulary.lookup_table[word]] += 1
+		sv = [0 for x in range(len(vocabulary.lookup_table))]
+		session = session.split() #tokenize
+		for word in session:
+			sv[vocabulary.lookup_table[word]] += 1
 		self.vector = sv
 
 class SessionGraph:
@@ -44,7 +43,7 @@ class SessionGraph:
 		#gather data
 		sessions = [x for x in sessions] #load all from the generator
 		vocabulary = Vocab(sessions)
-		session_vectors = [[n, SessionVector(x, vocabulary)] for n, x in enumerate(sessions)]
+		session_vectors = [[n, SessionVector(x, vocabulary.lookup_table)] for n, x in enumerate(sessions)]
 		
 		#input data to the graph object
 		g = nx.Graph()
@@ -69,4 +68,26 @@ def test_data_extraction():
 	for textblock in session_bag_of_words_generator():
 		print "=" * 25 #spacer
 		print textblock
+
+def test_vocab():
+	"""Tests creation of a vocabulary table"""
+	sessions = [x for x in session_bag_of_words_generator()]
+	v = Vocab(sessions)
+	return v
+
+def test_session_vectors():
+	"""Outputs a list of session vectors, truncated at 100 characters"""
+	sessions = [x for x in session_bag_of_words_generator()]
+	v = Vocab(sessions)
+	for session in sessions:
+		x = SessionVector(session, v)
+		print str(x.vector)[:100]
+	
+
+def test_graph_output():
+	"""Run this to output a graph of all sessions"""
+	sessions = [x for x in session_bag_of_words_generator()]
+	sg = SessionGraph(sessions)
+	sg.output_gexf("/tmp/test.gexf")
+
 	
