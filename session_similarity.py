@@ -50,18 +50,35 @@ class SessionGraph:
 		g.add_nodes_from([x[0] for x in session_vectors])
 		
 		#iterate through nodes
-		for x in range(len(g.nodes())-1):
-			if tuple(sorted((x, x+1))) not in g.edges(): #has to be a better way to check edge existence
-														#, or is this even necessary given x, x+1 iterations?
-				#calculate the weight as the cosine similarity
-				sc = cosine(session_vectors[x][1].vector, session_vectors[x+1][1].vector)
-				g.add_weighted_edges_from([[x, x+1, sc]])
+		for x in xrange(len(g.nodes())):
+			for y in range(x):
+				if y != x:
+					if tuple(sorted((x, y))) not in g.edges(): #has to be a better way to check edge existence, or is this even necessary given x, x+1 iterations?
+						#calculate the weight as the cosine similarity
+						sc = cosine(session_vectors[x][1].vector, session_vectors[y][1].vector)
+						g.add_weighted_edges_from([[x, y, sc]])
 		
 		self.graph = g
+		self.vocabulary = vocabulary
+		self.session_vectors = session_vectors
+		self.sessions = sessions
+	
+	def most_related_sessions(self):
+		weight = 1
+		edge = 0
+		for edge in self.graph.edges():
+			for other_edge, info in self.graph.edge[edge[0]].iteritems():
+				if info['weight'] < weight:
+					weight = info[weight]
+					edge = [edge, other_edge]
+		print "edge {0} with weight {1} is the most related".format(edge, weight)
+		print "Session {0}:".format(edge[0])
+		print self.sessions[edge[0]]
+		print "Session {0}:".format(edge[1])
+		print self.sessions[edge[1]]
 		
 	def output_gexf(self, where_to):
 		nx.write_gexf(self.graph, where_to)
-
 
 def test_data_extraction():
 	"""How to retrieve sessions as blocks of queries"""
@@ -89,4 +106,7 @@ def test_graph_output():
 	sg = SessionGraph(sessions)
 	sg.output_gexf("/tmp/test.gexf")
 
-	
+def test_related_sessions():
+	sessions = [x for x in session_bag_of_words_generator()]
+	sg = SessionGraph(sessions)
+	sg.most_related_sessions()
