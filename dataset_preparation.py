@@ -15,6 +15,7 @@ import sqlite3, time, urlparse, re
 from collections import defaultdict
 from os import listdir
 from os.path import isdir, exists
+from codecs import open as copen
 
 #SUBROUTINES
 def find_repositories_on_computer():
@@ -121,7 +122,7 @@ def spot_persistent_title_components(url_data):
 	
 	domain_urls = defaultdict(list)
 	
-	#have to first titles organize per domain
+	#have to first organize titles per domain
 	for item in url_data:
 		url = item[0]
 		if "://" in url:
@@ -244,9 +245,39 @@ class QueryFinder:
 		#make it accessible
 		self.lookup_table = d
 
+def session_bag_of_words_generator_with_titles():
+	"""A generator that yields strings containing every search
+	keyword the user made in that session as well as titles"""
+	
+	#create Query Lookup Table
+	q = QueryFinder(0) #zero for all days
+	
+	#get browsing data
+	dbloc = find_repositories_on_computer()
+	dbloc = [x for x in dbloc if "Test" in x][0]
+	sessions = sessionized_visit_group_generator(dbloc)
+	
+	for session in sessions:
+		queries_and_titles = [] #similar code to test_sessionizer_with_queries
+		for url in session:
+			up = urlparse.urlparse(url[0])
+			if up.netloc in q.lookup_table:
+				for get_var, value in urlparse.parse_qs(up.query).iteritems():
+					if get_var in q.lookup_table[up.netloc]:
+						query = value[0]
+						title = url[1]
+						#dedupe runs
+						if queries_and_titles == []:
+							queries_and_titles.append([query, title])
+						else:
+							if queries_and_titles[-1] != [query, title]:
+								queries_and_titles.append([query, title])
+		queries_and_titles = "\n".join(['\n'.join(x) for x in queries_and_titles])
+		yield queries_and_titles
+
 def session_bag_of_words_generator():
 	"""A generator that yields strings containing every search
-	keyword the user made in that session"""
+	keyword the user made in that session as well as titles"""
 	
 	#create Query Lookup Table
 	q = QueryFinder(0) #zero for all days
@@ -303,6 +334,14 @@ def test_sessionizer():
 		
 		print "{0}\t{1} minutes\t{2} page views".format(date, duration, total)
 
+def test_bow_titles():
+	"""Tests session bag of words with titles output"""
+	sessions = session_bag_of_words_generator_with_titles()
+	with copen('queries_and_titles.txt', 'w', encoding='utf8') as f:
+		f.write('\n'.join([x for x in sessions]))
+	#for s in sessions:
+	#	print s
+
 def test_sessionizer_with_queries():
 	"""Displays sessions, but also with query info"""
 	
@@ -334,24 +373,3 @@ def test_sessionizer_with_queries():
 		total_pages_viewed = len(session)
 		#output
 		print "{0}\t{1} minutes\t{2} page views\t{3} words: {4}...".format(date, duration, total_pages_viewed, len(words), words[:5])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
