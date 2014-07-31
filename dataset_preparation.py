@@ -154,6 +154,92 @@ def spot_persistent_title_components(url_data):
 	#top 20% are usually good
 	return dtc[:int(len(dtc)*0.20)]
 
+def get_domain(url):
+	"""Simple way to fetch the domain including subdomain"""
+	if "://" in url:
+		domain = url.split("://")[1]
+	
+	if "/" in domain:
+		domain = domain.split('/')[0]
+	else:
+		if "?" in domain:
+			domain = domain.split('?')[0]
+	
+	return domain
+
+def remove_persistent_title_components_across_sessions(session_titles):
+	"""Code to remove persistent title components by comparing different titles across sessions
+	Accepts a list of sessions, each session being a list of [url, title] pairs
+	Returns a list of the titles with the components removed"""
+	
+	domain_urls = defaultdict(list)
+	
+	#have to first organize titles per domain
+	for session in session_titles:
+		for item in session:
+			domain = get_domain(item[0])
+			domain_urls[domain].append(item[1])
+	
+	#what are the most common suffixes?
+	suffixes = defaultdict(lambda: defaultdict(int))
+	for domain, title_group in domain_urls.iteritems():
+		for x in range(len(title_group)-1):
+			if title_group[x] != title_group[x+1]:
+				lcns = longest_common_ngram_suffix(title_group[x], title_group[x+1])
+				if lcns != "":
+					suffixes[domain][lcns] +=1
+	
+	#delete single occurrences
+	suffixes2 = {}
+	for domain, component_counts in suffixes.iteritems():
+		tmp_component_counts = {}
+		for component, count in component_counts.iteritems():
+			if count > 1:
+				tmp_component_counts[component] = 0
+		suffixes2[domain] = tmp_component_counts
+	suffixes = 0 #clear memory
+	
+	#delete title components that only appear in one session
+	#first need to iterate through all sessions again,
+	#noting down the suffix components counts
+	for session in session_titles:
+		#make a mini dict per session
+		tmp_dict = defaultdict(lambda: defaultdict(int))
+		for url_title_pair in session:
+			domain = get_domain(url_title_pair[0])
+			#check for component existence in suffixes2
+			if domain in suffixes2:			
+				for component in suffixes2[domain]:
+					if component in url_title_pair[1]:
+						tmp_dict[domain][component] += 1
+						
+		#now add 1 for each item in the tmp_dict
+		for domain, component_count in tmp_dict.iteritems():
+			for component, count in component_count.iteritems():
+				suffixes2[domain][component] += 1
+	#now we actually remove those that only appear in one session
+	suffixes = {}
+	for domain, component_count in suffixes2.iteritems():
+		components = set([comp for comp, count in component_count.iteritems() if count > 1])
+		suffixes[domain] = components
+	
+	#iterate through again, and remove title components
+	session_titles_new = []
+	for session in session_titles:
+		tmp_session = []
+		for url_title_pair in session:
+			domain = get_domain(url_title_pair[0])
+			if domain in suffixes:
+				for component in suffixes[domain]:
+					if component in url_title_pair[1]:
+						url_title_pair[1] = url_title_pair[1].replace(component, "")
+						break
+			tmp_session.append(url_title_pair)
+		session_titles_new.append(tmp_session)
+	
+	return session_titles_new
+	
+
 def sessionized_visit_group_generator(db_location):
 	"""Digs into the history and yields historical browsing sessions
 	Sessions are defined as having a 30 minute gap between page views"""
@@ -275,6 +361,44 @@ def session_bag_of_words_generator_with_titles():
 		queries_and_titles = "\n".join(['\n'.join(x) for x in queries_and_titles])
 		yield queries_and_titles
 
+def one_session_bow_per_line():
+	"""Returns a list of strings.
+	Each string contains all queries and page titles
+	The titles have had common suffixes removed
+	They haven't been cleaned yet (e.g. stopwords, stemming etc)"""
+	
+	#create Query Lookup Table
+	q = QueryFinder(0) #zero for all days
+	
+	#get browsing data
+	dbloc = find_repositories_on_computer()
+	dbloc = [x for x in dbloc if "Test" in x][0]
+	sessions = sessionized_visit_group_generator(dbloc)
+	
+	session_data = [] #finalized session data
+
+	#get all session and title data	
+	for session in sessions:
+		queries_and_titles = [] #similar code to test_sessionizer_with_queries
+		for url in session:
+			up = urlparse.urlparse(url[0])
+			if up.netloc in q.lookup_table:
+				for get_var, value in urlparse.parse_qs(up.query).iteritems():
+					if get_var in q.lookup_table[up.netloc]:
+						query = value[0]
+						title = url[1]
+						#dedupe runs
+						if queries_and_titles == []:
+							queries_and_titles.append([query, title])
+						else:
+							if queries_and_titles[-1] != [query, title]:
+								queries_and_titles.append([query, title])
+		session_data.append(queries_and_titles)
+
+	#now remove persistent title suffixes
+	
+	
+
 def session_bag_of_words_generator():
 	"""A generator that yields strings containing every search
 	keyword the user made in that session as well as titles"""
@@ -339,8 +463,6 @@ def test_bow_titles():
 	sessions = session_bag_of_words_generator_with_titles()
 	with copen('queries_and_titles.txt', 'w', encoding='utf8') as f:
 		f.write('\n'.join([x for x in sessions]))
-	#for s in sessions:
-	#	print s
 
 def test_sessionizer_with_queries():
 	"""Displays sessions, but also with query info"""
