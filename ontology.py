@@ -7,11 +7,10 @@ from collections import defaultdict
 from sys import argv
 import re
 
-from lda_gensim import stopwords as STOPWORDS
+from lda_gensim import stopwords as STOPWORDS;STOPWORDS=STOPWORDS() #maybe a better way of doing that
 
 REMOTE_DIR = "http://wifo5-04.informatik.uni-mannheim.de/downloads/datasets/" #3.5m raw topic signatures 
 LOCAL_FILE = "topic_signatures_en.tsv"
-STOPWORDS = set(('the', 'a', 'and', 'on')) #todo: longer
 
 def ngrams(s, n):
 	"""Given a string s, splits it into ngrams"""
@@ -31,7 +30,7 @@ def stoplist_ngrams(s, n):
 	#rather than "cat sat", "sat mat"
 	
 	ngrams = []
-	s = s.split()
+	s = s.lower().split()
 	for i in range(len(s)-n+1):
 		ngram = s[i:i+n]
 		add = True
@@ -66,7 +65,17 @@ class Ontology:
 				wiki_article_title = line[0] #useful
 				
 				rest = line[1].split('"')
-				page_text_salient_keywords = rest[-1].split() #useful
+				page_text_salient_keywords = [x for x in rest[-1].split() if x not in STOPWORDS] #useful
+				
+				if 'its' in page_text_salient_keywords:
+					print page_text_salient_keywords
+					print wiki_article_title
+					print rest[-1]
+					print rest[-1].split()
+					print [True for x in rest[-1].split() if x in STOPWORDS]
+					
+					raise Exception("FFFFFFFFFFFUUUU")
+					exit()
 				
 				title_components = [x for x in rest[:-1] if "+" not in x.strip()]
 				
@@ -78,11 +87,11 @@ class Ontology:
 						for kw in page_text_salient_keywords:
 							self.bigram_keyword_distributions[y][kw] += 1
 				
-				self.wikipedia_page_keywords[wiki_article_title] = title_keywords
+				self.wikipedia_page_keywords[wiki_article_title] = page_text_salient_keywords
 				
 				if n % 100000 == 0:
 					print "Processed {0}% of the pages".format((n/3500000.0)*100)
-			print "Total: {0} articles".format(len(topics))
+			print "Total: {0} articles {1} bigrams {2} keywords".format(len(self.wikipedia_page_keywords), len(self.bigram_keyword_distributions), len(self.keyword_keyword_distributions))
 	
 	def describe_phrase(self, phrase):
 		"""Takes a phrase and returns either the bigram or keyword results, sorted descending"""
@@ -93,8 +102,8 @@ class Ontology:
 		elif phrase in self.keyword_keyword_distributions:
 			return sorted(self.keyword_keyword_distributions[phrase].items(), key=lambda x: x[1], reverse=True)
 		
-		elif phrase in self.bigram_keyword_distribtributions:
-			return sorted(self.bigram_keyword_distribtributions[phrase].items(), key=lambda x: x[1], reverse=True)
+		elif phrase in self.bigram_keyword_distributions:
+			return sorted(self.bigram_keyword_distributions[phrase].items(), key=lambda x: x[1], reverse=True)
 		
 		else:
 			return None #could raise an exception but hmmm
