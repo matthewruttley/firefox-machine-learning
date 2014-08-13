@@ -67,16 +67,6 @@ class Ontology:
 				rest = line[1].split('"')
 				page_text_salient_keywords = [x for x in rest[-1].split() if x not in STOPWORDS] #useful
 				
-				if 'its' in page_text_salient_keywords:
-					print page_text_salient_keywords
-					print wiki_article_title
-					print rest[-1]
-					print rest[-1].split()
-					print [True for x in rest[-1].split() if x in STOPWORDS]
-					
-					raise Exception("FFFFFFFFFFFUUUU")
-					exit()
-				
 				title_components = [x for x in rest[:-1] if "+" not in x.strip()]
 				
 				for x in title_components:
@@ -108,11 +98,13 @@ class Ontology:
 		else:
 			return None #could raise an exception but hmmm
 		
-	def classify_webpage(self, url, title): #might change this to *kwargs
+	def classify_webpage(self, url, title): #might change this to *kwargs so users can just throw anything at it 
 		"""Attempts to classify a given webpage.
 		Returns the top 10 tier 1 keyword-categories and top 10 tier 1 bigram-categories"""
 		#this requires a matrix of words and bigrams to category words and bigrams
-
+		
+		title_bigrams = stoplist_ngrams()
+		
 
 if __name__ == '__main__':
 	o = Ontology(LOCAL_FILE)
