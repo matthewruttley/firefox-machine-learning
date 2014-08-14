@@ -234,7 +234,4 @@ def dbp_category_article_matrix():
 	output.close() 
 	f.close()
 
-def create_category_phrase_matrix():
-	"""Category <tab> phrase <tab> phrase .... etc"""
-	pass
 
