@@ -158,14 +158,17 @@ def get_domain(url):
 	"""Simple way to fetch the domain including subdomain"""
 	if "://" in url:
 		domain = url.split("://")[1]
-	
-	if "/" in domain:
-		domain = domain.split('/')[0]
+		
+		if "/" in domain:
+			domain = domain.split('/')[0]
+		else:
+			if "?" in domain:
+				domain = domain.split('?')[0]
+		
+		return domain
 	else:
-		if "?" in domain:
-			domain = domain.split('?')[0]
+		return None
 	
-	return domain
 
 def remove_persistent_title_components_across_sessions(session_titles):
 	"""Code to remove persistent title components by comparing different titles across sessions
@@ -178,7 +181,8 @@ def remove_persistent_title_components_across_sessions(session_titles):
 	for session in session_titles:
 		for item in session:
 			domain = get_domain(item[0])
-			domain_urls[domain].append(item[1])
+			if domain:
+				domain_urls[domain].append(item[1])
 	
 	#what are the most common suffixes?
 	suffixes = defaultdict(lambda: defaultdict(int))
@@ -227,18 +231,17 @@ def remove_persistent_title_components_across_sessions(session_titles):
 	session_titles_new = []
 	for session in session_titles:
 		tmp_session = []
-		for url_title_pair in session:
-			domain = get_domain(url_title_pair[0])
+		for url_title_query in session:
+			domain = get_domain(url_title_query[0])
 			if domain in suffixes:
 				for component in suffixes[domain]:
-					if component in url_title_pair[1]:
-						url_title_pair[1] = url_title_pair[1].replace(component, "")
+					if component in url_title_query[1]:
+						url_title_query[1] = url_title_query[1].replace(component, "")
 						break
-			tmp_session.append(url_title_pair)
+			tmp_session.append(url_title_query)
 		session_titles_new.append(tmp_session)
 	
 	return session_titles_new
-	
 
 def sessionized_visit_group_generator(db_location):
 	"""Digs into the history and yields historical browsing sessions
@@ -361,6 +364,17 @@ def session_bag_of_words_generator_with_titles():
 		queries_and_titles = "\n".join(['\n'.join(x) for x in queries_and_titles])
 		yield queries_and_titles
 
+def get_search_query(qf_object, url):
+	"""Gets a search query. If none found, returns False"""
+	up = urlparse.urlparse(url)
+	if up.netloc in qf_object.lookup_table:
+		for get_var, value in urlparse.parse_qs(up.query).iteritems():
+			if get_var in qf_object.lookup_table[up.netloc]:
+				query = value[0]
+				if query != "":
+					return query
+	return False
+
 def one_session_bow_per_line():
 	"""Returns a list of strings.
 	Each string contains all queries and page titles
@@ -377,27 +391,28 @@ def one_session_bow_per_line():
 	
 	session_data = [] #finalized session data
 
-	#get all session and title data	
+	#get all session and title data
 	for session in sessions:
-		queries_and_titles = [] #similar code to test_sessionizer_with_queries
+		clicks = [] #tmp session object [[url, title, query]]
 		for url in session:
-			up = urlparse.urlparse(url[0])
-			if up.netloc in q.lookup_table:
-				for get_var, value in urlparse.parse_qs(up.query).iteritems():
-					if get_var in q.lookup_table[up.netloc]:
-						query = value[0]
-						title = url[1]
-						#dedupe runs
-						if queries_and_titles == []:
-							queries_and_titles.append([query, title])
-						else:
-							if queries_and_titles[-1] != [query, title]:
-								queries_and_titles.append([query, title])
-		session_data.append(queries_and_titles)
+			query = get_search_query(q, url[0])
+			click = [url[0], url[1], query]
+			if clicks == []:
+				clicks.append(click)
+			else:
+				if clicks[-1] != click:
+					clicks.append(click)
+		session_data.append(clicks)
 
 	#now remove persistent title suffixes
+	session_data = remove_persistent_title_components_across_sessions(session_data)
 	
+	#now format per line
+	session_bows = []
+	for session in session_data:
+		session_bows.append(' '.join([' '.join(x[1:]) if x[-1] != False else x[1] for x in session]))
 	
+	return session_bows
 
 def session_bag_of_words_generator():
 	"""A generator that yields strings containing every search
@@ -463,6 +478,12 @@ def test_bow_titles():
 	sessions = session_bag_of_words_generator_with_titles()
 	with copen('queries_and_titles.txt', 'w', encoding='utf8') as f:
 		f.write('\n'.join([x for x in sessions]))
+
+def test_persistent_title_component_remover():
+	""""""
+	pass
+
+#TODO
 
 def test_sessionizer_with_queries():
 	"""Displays sessions, but also with query info"""
