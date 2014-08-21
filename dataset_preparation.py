@@ -364,6 +364,36 @@ def session_bag_of_words_generator_with_titles():
 		queries_and_titles = "\n".join(['\n'.join(x) for x in queries_and_titles])
 		yield queries_and_titles
 
+def session_query_generator():
+	"""Generates lists of lists containing queries from the session.
+	No dedupe-ing, since that might reduce intent focus. Very similar to
+	session_bag_of_words_generator_with_titles"""
+	
+	#find database
+	#query finders
+	#sessionizer
+	
+	q = QueryFinder(0) #zero for all days
+	
+	#get browsing data
+	dbloc = find_repositories_on_computer()
+	dbloc = [x for x in dbloc if "Test" in x][0]
+	sessions = sessionized_visit_group_generator(dbloc)
+	
+	for session in sessions:
+		queries = [] #similar code to test_sessionizer_with_queries
+		for url in session:
+			up = urlparse.urlparse(url[0])
+			if up.netloc in q.lookup_table:
+				for get_var, value in urlparse.parse_qs(up.query).iteritems():
+					if get_var in q.lookup_table[up.netloc]:
+						queries.append(value[0])
+						
+		#queries = " ".join(queries)
+		yield queries
+	
+	
+
 def get_search_query(qf_object, url):
 	"""Gets a search query. If none found, returns False"""
 	up = urlparse.urlparse(url)
