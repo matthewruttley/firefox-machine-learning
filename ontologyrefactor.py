@@ -207,21 +207,61 @@ class Ontology:
 				for x in range(0, len(line[1:]), 2):
 					keywords[line[x+1]] = int(line[x+2])
 				self.category_keywords[category] = keywords
-		
 		#pruning
 		#import words file
-		words = []
-		with copen('/usr/share/dict/words', encoding='utf8') as f:
-			for line in f:
-				line = line[:-1]
-				words.append(line.lower())
-		words = set(words)
+		#words = []
+		#with copen('/usr/share/dict/words', encoding='utf8') as f:
+		#	for line in f:
+		#		line = line[:-1]
+		#		words.append(line.lower())
+		#words = set(words)
 		to_save = {}
 		for key, value in self.category_keywords.iteritems():
-			if "_" not in key:
-				if key.lower() in words:
-					to_save[key] = value
+			if len(value) >= 25:
+				to_save[key] = value
 		self.category_keywords = to_save
+		print "Classification algorithm has {0} wikipedia categories to pick from".format(len(self.category_keywords))
+		
+		d = defaultdict(list)
+		with copen("freebase.txt", encoding='utf8') as f:
+			for line in f:
+				if len(line) > 5:
+					line = line[:-1]
+					line = line.split("\t")
+					category = line[0]
+					terms = line[1:]
+					for t in terms:
+						t = t.lower().split()
+						for x in t:
+							d[category].append(x)
+		self.freebase = {}
+		for k,v in d.iteritems():
+			self.freebase[k] = Counter(v)
+		
+		print "Classification algorithm has {0} freebase categories to pick from".format(len(self.freebase))
+		
+		#now try with IAB
+		
+		self.iab_bigrams = defaultdict(list)
+		self.iab_keywords = defaultdict(list)
+		
+		with copen("iab_wiki_bigrams.tsv", encoding='utf8') as f:
+			for line in f:
+				if line != "":
+					line = line[:-1].split("\t")
+					category = line[0]
+					for x in range(0, len(line[1:]), 2):
+						for i in range(int(line[x+2])):
+							self.iab_bigrams[category].append(line[x+1])
+		
+		with copen("iab_wiki_keywords.tsv", encoding='utf8') as f:
+			for line in f:
+				if line != "":
+					line = line[:-1].split("\t")
+					category = line[0]
+					for x in range(0, len(line[1:]), 2):
+						for i in range(int(line[x+2])):
+							self.iab_keywords[category].append(line[x+1])
 	
 	def classify_webpage(self, url, title): #might change this to *kwargs so users can just throw anything at it 
 		"""Attempts to classify a given webpage. Returns 10 categories"""
@@ -277,8 +317,44 @@ class Ontology:
 		
 		matches = sorted(matches, key=lambda x: x[1], reverse=True)[:10]
 		return matches
+	
+	def classify_webpage_with_freebase(self, text):
+		"""Classifies articles using 2 level freebase categorization system"""
+		
+		text = re.findall("[a-z]+", text.lower())
+		scores = []
+		
+		for category, keywords in self.freebase.iteritems():
+			scores.append([category, cosim(keywords, text)])
+		
+		scores = sorted(scores, key=lambda x: x[1], reverse=True)[:10]
+		return scores
+	
+	def classify_webpage_with_iab_keywords(self, text):
+		"""Classifies sessions using the IAB keywords dataset"""
+		
+		text = re.findall("[a-z]+", text.lower())
+		scores = []
+		
+		for category, keywords in self.iab_keywords.iteritems():
+			scores.append([category, cosim(keywords, text)])
+		
+		scores = sorted(scores, key=lambda x: x[1], reverse=True)[:10]
+		return scores
+	
+	def classify_webpage_with_iab_bigrams(self, text):
+		
+		text = ngrams(text.lower(), 2)
+		scores = []
+		
+		for category, bigrams in self.iab_bigrams.iteritems():
+			scores.append([category, cosim(bigrams, text)])
+		
+		scores = sorted(scores, key=lambda x: x[1], reverse=True)[:10]
+		return scores
 
-def classify_session_queries():
+
+def classify_session_queries(cls_type='freebase', kw_type='kws'):
 	"""Classifies user sessions"""
 	#have to think of a good diagnostic output
 	#need: sample domains, urls, keywords, and then classifications
@@ -306,7 +382,14 @@ def classify_session_queries():
 	print "Iterating through sessions..."
 	for session in sessions:
 		
+		#if len(classifications) > 30:
+		#	break
+		
 		print "Recieved session with {0} queries".format(len(session))
+		
+		if len(session) < 5:
+			print "Skipped as too short"
+			continue
 		
 		results = {}
 		
@@ -315,11 +398,22 @@ def classify_session_queries():
 		
 		session_bow = " ".join(session) #session bag of words
 		
-		keywords = re.findall("[a-zA-Z]+", session_bow)
-		results['keywords'] = "{0} total, e.g.:\n{1}".format(len(keywords), ", ".join(["{1}-{2}".format(n,k,v) for n, (k,v) in enumerate(sorted(Counter(keywords).items(), key=lambda x: x[1], reverse=True)[:20])]))
+		if kw_type == "bigrams":
+			keywords = ngrams(session_bow, 2)
+		else:
+			keywords = re.findall("[a-zA-Z]+", session_bow)
 		
-		cls = o.classify_webpage_with_ii(session_bow)
-		results['classification'] = u"<br>".join([u"{0}-{1}".format(x[0], round(x[1],2)) for x in cls])
+		formatted_kws = Counter(keywords).most_common(20)
+		results['keywords'] = "{0} total, e.g.:\n{1}".format(len(keywords), formatted_kws)
+		
+		if cls_type == "iab_keywords":
+			cls = o.classify_webpage_with_iab_keywords(session_bow)
+		elif cls_type == "iab_bigrams":
+			cls = o.classify_webpage_with_iab_bigrams(session_bow)
+		else:
+			cls = o.classify_webpage_with_freebase(session_bow)
+		
+		results['classification'] = u"<br>".join([u"{0}-{1}".format(x[0], round(x[1],2)) for x in cls if x[1] > 0])
 		
 		classifications.append(results)
 	
@@ -336,7 +430,7 @@ def classify_session_queries():
 	
 	print "Done"
 
-def classify_sessions():
+def classify_sessions(cls_type="freebase", kw_type='kws'):
 	"""Classifies user sessions"""
 	#have to think of a good diagnostic output
 	#need: sample domains, urls, keywords, and then classifications
@@ -387,7 +481,7 @@ def classify_sessions():
 	classifications = []
 	
 	print "Iterating through sessions..."
-	for session in sessions[:25]:
+	for session in sessions:
 		
 		print "Recieved session of length {0}".format(len(session))
 		
@@ -402,11 +496,22 @@ def classify_sessions():
 		results['pageviews'] = pageviews
 		session_bow = " ".join([x[1] for x in session]) #session bag of words
 		
-		keywords = re.findall("[a-zA-Z]+", session_bow)
-		results['keywords'] = "{0} total, e.g.:\n{1}".format(len(keywords), ", ".join(["{1}-{2}".format(n,k,v) for n, (k,v) in enumerate(sorted(Counter(keywords).items(), key=lambda x: x[1], reverse=True)[:20])]))
+		if kw_type == "bigrams":
+			keywords = ngrams(session_bow, 2)
+		else:
+			keywords = re.findall("[a-zA-Z]+", session_bow)
 		
-		cls = o.classify_webpage_with_ii(session_bow)
-		results['classification'] = u"<br>".join([u"{0}-{1}".format(x[0], round(x[1],2)) for x in cls])
+		formatted_kws = Counter(keywords).most_common(20)
+		results['keywords'] = "{0} total, e.g.:\n{1}".format(len(keywords), formatted_kws)
+		
+		if cls_type == "iab_keywords":
+			cls = o.classify_webpage_with_iab_keywords(session_bow)
+		elif cls_type == "iab_bigrams":
+			cls = o.classify_webpage_with_iab_bigrams(session_bow)
+		else:
+			cls = o.classify_webpage_with_freebase(session_bow)
+		
+		results['classification'] = u"<br>".join([u"{0}-{1}".format(x[0], round(x[1],2)) for x in cls if x[1] > 0])
 		
 		classifications.append(results)
 	
@@ -431,9 +536,16 @@ def classify_sessions():
 
 if __name__ == '__main__':
 	print "=========================="
-	print "++ mruttley - LWCA Demo v0.3 ++"
+	print "++ mruttley - LWCA Demo v0.4 ++"
 	print "=========================="
-	print "1. Classify all sessions using titles\n2. Classify all sessions using queries\n3. Classify sample titles one-by-one"
+	print """
+	1. Classify all sessions using titles
+	2. Classify all sessions using queries
+	3. Classify sample titles one-by-one
+	4. Classify all titles using IAB keywords
+	5. Classify all titles+queries using IAB keywords
+	6. Classify all titles using IAB bigrams
+	7. Classify all titles+queries using IAB bigrams"""
 	if len(argv) > 1:
 		decision = argv[1]
 	else:
@@ -446,6 +558,18 @@ if __name__ == '__main__':
 	elif "2" in decision:
 		#output to same file, just this time we're using session queries rather than titles
 		classify_session_queries()
+		call(["open", "sessions.html"])
+	elif "4" in decision: #iab keywords + titles
+		classify_sessions(cls_type="iab_keywords")
+		call(["open", "sessions.html"])
+	elif "5" in decision: #iab keywords + titles + queries
+		classify_session_queries(cls_type="iab_keywords")
+		call(["open", "sessions.html"])
+	elif "6" in decision: #iab bigrams + titles 
+		classify_sessions(cls_type="iab_bigrams", kw_type='bigrams')
+		call(["open", "sessions.html"])
+	elif "7" in decision: #iab bigrams + titles + queries
+		classify_session_queries(cls_type="iab_bigrams", kw_type='bigrams')
 		call(["open", "sessions.html"])
 	else:
 		print "Importing payload...",
