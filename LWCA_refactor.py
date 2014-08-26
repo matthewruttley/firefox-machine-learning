@@ -235,32 +235,32 @@ class Ontology:
 			if kw in self.wordlist:
 				keyword_distribution[kw] += 1
 		
-		##calculate vector magnitude from final counts
-		##calculate the dot product at the same time
-		#magnitude = 0
-		#
-		#dot_products = [[category, 0] for category in self.iab_keywords.keys()]
-		#
-		#for keyword, count in keyword_distribution.iteritems():
-		#	magnitude += count ** 2
-		#	for n, (category, _) in enumerate(dot_products):
-		#		if keyword in self.keyword_sets[category]:
-		#			dot_products[n][1] += self.iab_keywords[category][keyword] * count
-		#
-		##calculate final scores
-		#scores = []
-		#magnitude = sqrt(magnitude)
-		#for category, dot_product in dot_products:
-		#	denom = self.magnitude_sqrts[category] * magnitude
-		#	if denom != 0:
-		#		scores.append((category, dot_product / denom))
+		#calculate vector magnitude from final counts
+		#calculate the dot product at the same time
+		magnitude = 0
+		
+		dot_products = [[category, 0] for category in self.iab_keywords.keys()]
+		
+		for keyword, count in keyword_distribution.iteritems():
+			magnitude += count ** 2
+			for n, (category, _) in enumerate(dot_products):
+				if keyword in self.keyword_sets[category]:
+					dot_products[n][1] += self.iab_keywords[category][keyword] * count
+		
+		#calculate final scores
+		scores = []
+		magnitude = sqrt(magnitude)
+		for category, dot_product in dot_products:
+			denom = self.magnitude_sqrts[category] * magnitude
+			if denom != 0:
+				scores.append((category, dot_product / denom))
 		
 		#or just try keyword overlap lol
-		text_set = set(keyword_distribution.keys())
-		scores = []
-		for category, kwset in self.keyword_sets.iteritems():
-			intersection = len(kwset.intersection(text_set))
-			scores.append([category, intersection/float(len(kwset)) * 100])
+		#text_set = set(keyword_distribution.keys())
+		#scores = []
+		#for category, kwset in self.keyword_sets.iteritems():
+		#	intersection = len(kwset.intersection(text_set))
+		#	scores.append([category, intersection/float(len(kwset)) * 100])
 		
 		scores = sorted(scores, key=lambda x: x[1], reverse=True)[:5]
 		return scores
@@ -278,7 +278,7 @@ def classify():
 	dbloc = [x for x in dbloc if "Test" in x][0]
 	sessions = sessionized_visit_group_generator(dbloc, 30)
 	print "done."
-
+	
 	print "Cleaning page titles of persistent components..."
 	sessions = remove_persistent_title_components_across_sessions(sessions)
 	print "done."
