@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 
-#IAB process
-#IAB taxonomy is somewhat out of date and has many irrelevancies
-#e.g. "Palmtops/PDAs", "Web Clip Art", "Soap Making" or separate topics combined such as
-#coins/stamps, australia/nz
+#IAB Taxonomy Crunching Module
+#v0.1 - basically iterates through subcats, checks wikipedia for nearest match, makes a kw distribution for that file's cleaned text
+#v0.2 - performs TFIDF on each of the articles and sets their scores per kw instead of simple counts
+#(future) v0.2a - uses a stemmer (not sure about client side performance though)
+#(future) v0.2b - investigates using subcats rather than toplevel in the output file. 
+
+#Comments:
+#IAB taxonomy is somewhat out of date and has many irrelevancies so had to be slightly modified:
+#e.g. "Palmtops/PDAs", "Web Clip Art", "Soap Making" or separate topics combined such as coins/stamps, australia/nz
 #IAB24 is "uncategorized"
 
 iab = {
@@ -19,25 +24,25 @@ iab = {
 	"IAB2": "Automotive",
 	"IAB2-1": "Auto Parts",
 	"IAB2-2": "Auto Repair",
-	"IAB2-3": "Buying Cars",
+	"IAB2-3": "Purchasing a car",
 	"IAB2-3a": "Selling Cars",
 	"IAB2-4": "Car Culture",
 	"IAB2-5": "Certified Pre-Owned",
 	"IAB2-6": "Convertible",
-	"IAB2-7": "Coupe",
-	"IAB2-8": "Crossover",
+	"IAB2-7": "Coupe Car",
+	"IAB2-8": "Crossover Car",
 	"IAB2-9": "Diesel",
 	"IAB2-10": "Electric Vehicle",
 	"IAB2-11": "Hatchback",
-	"IAB2-12": "Hybrid",
-	"IAB2-13": "Luxury",
+	"IAB2-12": "Hybrid Car",
+	"IAB2-13": "Luxury Car",
 	"IAB2-14": "MiniVan",
-	"IAB2-15": "Mororcycles",
+	"IAB2-15": "Motorcycles",
 	"IAB2-16": "Off-Road Vehicles",
 	"IAB2-17": "Performance Vehicles",
-	"IAB2-18": "Pickup",
-	"IAB2-19": "Road-Side Assistance",
-	"IAB2-20": "Sedan",
+	"IAB2-18": "Pickup truck",
+	"IAB2-19": "RoadSide Assistance",
+	"IAB2-20": "Sedan Car",
 	"IAB2-21": "Trucks",
 	"IAB2-22": "Vintage Cars",
 	"IAB2-23": "Wagon",
@@ -71,7 +76,7 @@ iab = {
 	"IAB5-1": "7-12 Education",
 	"IAB5-2": "Adult Education",
 	"IAB5-3": "Art History",
-	"IAB5-4": "Colledge Administration",
+	"IAB5-4": "College Administration",
 	"IAB5-5": "College Life",
 	"IAB5-6": "Distance Learning",
 	"IAB5-7": "English as a 2nd Language",
@@ -85,18 +90,18 @@ iab = {
 	"IAB5-15": "Studying Business",
 	"IAB6": "Family & Parenting",
 	"IAB6-1": "Adoption",
-	"IAB6-2": "Babies & Toddlers",
+	"IAB6-2": "Toddlers",
 	"IAB6-3": "Daycare",
 	"IAB6-3a": "Preschool",
 	"IAB6-4": "Family Internet",
-	"IAB6-5": "Parenting - K-6 Kids",
-	"IAB6-6": "Parenting teens",
+	"IAB6-5": "Parenting children",
+	"IAB6-6": "Parenting teenagers",
 	"IAB6-7": "Pregnancy",
 	"IAB6-8": "Special Needs Kids",
 	"IAB6-9": "Eldercare",
 	"IAB7": "Health & Fitness",
 	"IAB7-1": "Exercise",
-	"IAB7-2": "A.D.D.",
+	"IAB7-2": "Attention Defecit Disorder",
 	"IAB7-3": "AIDS HIV",
 	"IAB7-4": "Allergies",
 	"IAB7-5": "Alternative Medicine",
@@ -112,7 +117,7 @@ iab = {
 	"IAB7-15": "Cold Flu",
 	"IAB7-16": "Deafness",
 	"IAB7-17": "Dental Care",
-	"IAB7-18": "Depression",
+	"IAB7-18": "Mental Depression",
 	"IAB7-19": "Dermatology",
 	"IAB7-20": "Diabetes",
 	"IAB7-21": "Epilepsy",
@@ -123,7 +128,7 @@ iab = {
 	"IAB7-26": "Holistic Healing",
 	"IAB7-27": "IBS Crohn's Disease",
 	"IAB7-28": "Incest Abuse Support",
-	"IAB7-29": "Incontinence",
+	"IAB7-29": "Bowel Incontinence",
 	"IAB7-30": "Infertility",
 	"IAB7-31": "Men's Health",
 	"IAB7-32": "Nutrition",
@@ -131,8 +136,8 @@ iab = {
 	"IAB7-34": "Panic Anxiety Disorders",
 	"IAB7-35": "Pediatrics",
 	"IAB7-36": "Physical Therapy",
-	"IAB7-37": "Psychology/Psychiatry",
-	"IAB7-38": "Senor Health",
+	"IAB7-37": "Psychology & Psychiatry",
+	"IAB7-38": "Senior Health",
 	"IAB7-39": "Sexuality",
 	"IAB7-40": "Sleep Disorders",
 	"IAB7-41": "Smoking Cessation",
@@ -155,7 +160,7 @@ iab = {
 	"IAB8-9": "Dining Out",
 	"IAB8-10": "Food Allergies",
 	"IAB8-11": "French Cuisine",
-	"IAB8-12": "Health Lowfat Cooking",
+	"IAB8-12": "Healthy Cooking",
 	"IAB8-13": "Italian Cuisine",
 	"IAB8-14": "Japanese Cuisine",
 	"IAB8-15": "Mexican Cuisine",
@@ -176,10 +181,10 @@ iab = {
 	"IAB9-10": "Collecting",
 	"IAB9-11": "Comic Books",
 	"IAB9-12": "Drawing",
-	"IAB9-12a": "Sketching",
+	"IAB9-12a": "Sketch drawing",
 	"IAB9-13": "Freelance Writing",
 	"IAB9-14": "Genealogy",
-	"IAB9-15": "Getting Published",
+	"IAB9-15": "Publishing Industry",
 	"IAB9-16": "Guitar",
 	"IAB9-17": "Home Recording",
 	"IAB9-18": "Investors",
@@ -195,7 +200,7 @@ iab = {
 	"IAB9-26a": "Fantasy",
 	"IAB9-27": "Scrapbooking",
 	"IAB9-28": "Screenwriting",
-	"IAB9-29": "Stamps",
+	"IAB9-29": "Postage Stamps",
 	"IAB9-29a": "Coins",
 	"IAB9-30": "Video Games",
 	"IAB9-31": "Woodworking",
@@ -206,7 +211,7 @@ iab = {
 	"IAB10-3": "Environmental Safety",
 	"IAB10-4": "Gardening",
 	"IAB10-5": "Home Repair",
-	"IAB10-6": "Home Theater",
+	"IAB10-6": "Home Theater systems",
 	"IAB10-7": "Interior Decorating",
 	"IAB10-8": "Landscaping",
 	"IAB10-9": "Construction",
@@ -219,7 +224,7 @@ iab = {
 	"IAB12-2": "National News",
 	"IAB12-3": "Local News",
 	"IAB13": "Personal Finance",
-	"IAB13-2": "Credit/Debt & Loans",
+	"IAB13-2": "Credit, Debt & Loans",
 	"IAB13-3": "Financial News",
 	"IAB13-4": "Financial Planning",
 	"IAB13-5": "Hedge Fund",
@@ -244,7 +249,7 @@ iab = {
 	"IAB15-4": "Geology",
 	"IAB15-5": "Paranormal Phenomena",
 	"IAB15-6": "Physics",
-	"IAB15-7": "Space/Astronomy",
+	"IAB15-7": "Space & Astronomy",
 	"IAB15-8": "Geography",
 	"IAB15-9": "Botany",
 	"IAB15-10": "Weather",
@@ -285,7 +290,7 @@ iab = {
 	"IAB17-26": "Basketball",
 	"IAB17-27": "Ice Hockey",
 	"IAB17-28": "Rodeo",
-	"IAB17-29": "Rugby",
+	"IAB17-29": "Rugby Sport",
 	"IAB17-30": "Running",
 	"IAB17-30a": "Jogging",
 	"IAB17-31": "Sailing",
@@ -309,12 +314,12 @@ iab = {
 	"IAB18-3": "Fashion",
 	"IAB18-4": "Jewelry",
 	"IAB18-5": "Clothing",
-	"IAB18-6": "Accessories",
+	"IAB18-6": "Fashion Accessories",
 	"IAB19": "Technology & Computing",
 	"IAB19-1": "3-D Graphics",
 	"IAB19-2": "Animation",
 	"IAB19-3": "Antivirus Software",
-	"IAB19-4": "C/C++",
+	"IAB19-4": "C & C++",
 	"IAB19-5": "Cameras & Camcorders",
 	"IAB19-6": "Cell Phones",
 	"IAB19-7": "Computer Certification",
@@ -329,16 +334,16 @@ iab = {
 	"IAB19-16": "Graphics Software",
 	"IAB19-17": "DVD",
 	"IAB19-18": "Internet Technology",
-	"IAB19-19": "Java",
+	"IAB19-19": "Java Programming",
 	"IAB19-20": "JavaScript",
 	"IAB19-21": "Mac Support",
-	"IAB19-22": "MP3/MIDI",
+	"IAB19-22": "MP3 & MIDI",
 	"IAB19-23": "Net Conferencing",
 	"IAB19-24": "Net for Beginners",
 	"IAB19-25": "Network Security",
 	"IAB19-26": "Mobile Computing",
 	"IAB19-27": "PC Support",
-	"IAB19-28": "Portable",
+	"IAB19-28": "Portable computing",
 	"IAB19-29": "Entertainment",
 	"IAB19-30": "Freeware",
 	"IAB19-31": "Unix",
@@ -359,7 +364,7 @@ iab = {
 	"IAB20-9": "Camping",
 	"IAB20-10": "Canada",
 	"IAB20-11": "Caribbean",
-	"IAB20-12": "Cruises",
+	"IAB20-12": "Cruise vacations",
 	"IAB20-13": "Eastern Europe",
 	"IAB20-14": "Europe",
 	"IAB20-15": "France",
@@ -378,7 +383,7 @@ iab = {
 	"IAB21": "Real Estate",
 	"IAB21-1": "Apartments",
 	"IAB21-2": "Architects",
-	"IAB21-3": "Buying/Selling Homes",
+	"IAB21-3": "Buying & Selling Homes",
 	"IAB22": "Shopping",
 	"IAB22-2": "Coupon",
 	"IAB22-3": "Price Comparison",
@@ -399,6 +404,10 @@ from codecs import open as copen
 from datetime import datetime
 from os import listdir
 from re import findall, sub
+import wikipedia
+
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 def find_nearest_category_text():
 	"""Finds closest article to process for each IAB sub category."""
@@ -605,9 +614,108 @@ def create_top_level_distributions():
 	#save category: top x bigrams
 	
 	return tld
-	
-	
 
+def create_top_level_distributions_from_wiki_search():
+	"""Creates bigram/keyword distributions for the top level categories,
+	using wikipedia search functionality.
+	
+	Test with: import iab;a=iab.create_top_level_distributions_from_wiki_search()"""
+	
+	#Create cat dictionary and storage for the end
+	cats = create_category_dictionary(iab)
+	top_level_distribs = defaultdict(lambda: defaultdict(list))
+	
+	#pruning
+	#setup stopwords
+	from lda_gensim import STOPWORDS
+	
+	#import words file
+	WORDLIST = []
+	with copen('/usr/share/dict/words', encoding='utf8') as f:
+		for line in f:
+			line = line[:-1]
+			WORDLIST.append(line.lower())
+	WORDLIST = set(WORDLIST)
+	
+	for top_level, sub_cats in cats.iteritems():
+		for subcat in sub_cats:
+			#search for it on wikipedia and grab top match
+			try:
+				nearest_match = wikipedia.search(subcat)[0]
+				print u"{0} ---> {1}".format(subcat, nearest_match)
+			except IndexError:
+				print "No matches found for" + unicode(subcat)
+				continue
+			
+			#grab article
+			try:
+				article = wikipedia.page(nearest_match)
+			except wikipedia.exceptions.DisambiguationError:
+				print "Too many things to disambiguate!"
+				continue
+			
+			#get the text and extract useful content
+			text = article.content.split('\n')
+		
+			#get nouns/bigrams from articles
+			conc_text = " ".join(text).lower()
+			keywords = []
+			to_add = findall("[a-z]+", conc_text)
+			for x in to_add:
+				if x not in STOPWORDS:
+					if x in WORDLIST:
+						keywords.append(x)
+			
+			#bigrams
+			bigrams = []
+			for line in text:
+				to_add = ngrams(' '.join(findall("[a-z]+", line.lower())), 2)
+				#print line
+				#print to_add
+				#raw_input("")
+				for x in to_add:
+					if (not x[0].isdigit()) and (not x[1].isdigit()):
+						if (x[0] not in STOPWORDS) and (x[1] not in STOPWORDS):
+							if (x[0] in WORDLIST) and (x[1] in WORDLIST):
+								bigrams.append(u" ".join(x))
+								#print "actually added: " + unicode(x)
+			
+			#save to object
+			top_level_distribs[top_level]["keywords"] += keywords
+			top_level_distribs[top_level]["bigrams"] += bigrams
+
+	#create counters for main object
+	tld = defaultdict(dict)
+	for k,v in top_level_distribs.iteritems():
+		for ngram, things in v.iteritems():
+			tld[k][ngram] = Counter(things)
+
+	#Possible optimizations
+	#TODO: normalization?
+	#TODO: prune 1-count entries?
+	#TODO: remove anything with len 4 or less
+	#TODO: remove anything like a person's name
+	
+	#save category: top x keywords
+	#save category: top x bigrams
+	for x in ["keywords", "bigrams"]:
+		with copen('iab_wiki_' + x + '.tsv', 'w', encoding='utf8') as f:
+			for key in a:
+				f.write(unicode(key) + u"\t" + u"\t".join([u"\t".join([unicode(z) for z in y]) for y in a[key][x].items()]) + u"\n")
+	
+	return tld
+
+def tokenize(text):
+	"""Tokenizes some text and makes sure the words exist"""
+	tokens = findall("[a-z]+", text.lower())
+	wordlist = [] #there must be a better way to do this in sklearn
+	with copen('/usr/share/dict/words', encoding='utf8') as f:
+		for line in f:
+			line = line[:-1]
+			wordlist.append(line.lower())
+	wordlist = set(wordlist)
+	tokens = [x for x in tokens if x in wordlist]
+	return tokens
 
 
 
