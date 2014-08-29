@@ -186,8 +186,33 @@ function classifySessions(){
 	//Returns an array of arrays [[], [], ...]
 	//Each sub-array like: [start_id, end_id, classification]
 	
-	console.log("Getting user data")
-	history = getHistory()
+	console.log("Getting user data...")
+	sessions = getHistory()
+	console.log("Cleaning page titles of persistent components...")
+	sessions = remove_persistent_title_components_across_sessions(sessions)
+	
+	console.log("Reading in wordlist")
+	const fileIO = require("sdk/io/file")
+	let dict = fileIO.read("dict_no_stopwords.txt")
+	let words = {} //interpreted as an object as lookups are O(1) rather than O(n)
+	for (let word in dict.split("\n")) {
+		words[word] = 1
+	}
+	
+	console.log("Reading in category payload and creating vectors")
+	let payloadfile = fileIO.read("payload.lwca").split("\n")
+	category_vectors = {}
+	for (let line of payloadfile) {
+		line = line.split("\t")
+		category = line[0]
+		counts = {}
+		for (x=1;x<line.length;x+=2) {
+			counts[line[x]] = parseInt(line[x+1])
+		}
+		category_vectors[category] = counts
+	}
+	
+	
 }
 
 
