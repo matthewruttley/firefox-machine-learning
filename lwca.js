@@ -1,17 +1,19 @@
 // LWCA - Latent Wiki Category Allocation
 // JavaScript implementation
-// mruttley - 2014-08-27
+// mruttley - 2014-08-27 ~ 09-03
+
+const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 
 function getHistory(){
 	//Generator that yields the most recent history urls
 	
 	//create the history service
-	var historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
+	let historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
 
 	//make a blank query
-	var options = historyService.getNewQueryOptions();
-	var query = historyService.getNewQuery();
-	var result = historyService.executeQuery(query, options);
+	let options = historyService.getNewQueryOptions();
+	let query = historyService.getNewQuery();
+	let result = historyService.executeQuery(query, options);
 
 	//open up the results
 	var cont = result.root;
@@ -70,7 +72,7 @@ String.prototype.endsWith = function(suffix) {
     return this.indexOf(suffix, this.length - suffix.length) !== -1;
 };
 
-function remove_persistent_title_components(sessions){
+function remove_persistent_title_components_across_sessions(sessions){
 	//Removes common title endings such as " - Google Search"
 	//Expects a list of lists of lists:
 	// [session, session, session] where each session is a list of [url, title, timstamp]
@@ -322,9 +324,16 @@ function classifySessions(){
 	session_tf = {}
 	df = {}
 	for (let session_number of sessions) {
-		let session = sessions[session_number]
+		
+		//tokenize
+		let session = ""
+		
+		for (let visit in sessions[session_number]) {
+			session += visit[1] + " "
+		}
+		
 		let tf = {}
-		for (let word in session.split(" ")) { // TODO: better tokenization than this
+		for (let word in session.split(" ")) { //todo: inefficient
 			if (tf.hasOwnProperty(word)) {
 				tf[word] += 1
 			}else{
