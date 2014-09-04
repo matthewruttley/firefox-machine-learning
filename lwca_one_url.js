@@ -180,9 +180,11 @@ function Classifier(){
 		const fileIO = require("sdk/io/file")
 		let dict = fileIO.read("/Users/mruttley/Documents/lwca_debug/data/dictnostops.txt")
 		this.wordlist = {} //interpreted as an object as lookups are O(1) rather than O(n)
-		for (let word in dict.split("\n")) {
+		for (let word of dict.split("\n")) {
 			this.wordlist[word] = 1
 		}
+		explain(this.wordlist, "wordlist")
+		console.log(Object.keys(this.wordlist).slice(0, 10))
 		
 		this.wordFinder = RegExp("[a-z]{3,}", "g") //to find words in a sentence
 		
@@ -214,7 +216,7 @@ function Classifier(){
 		let N = category_vectors.length
 		this.idf = {} //calculate IDF for each word
 		for (let word in df) {
-			idf[word] = Math.log(N/df[word])
+			this.idf[word] = Math.log(N/df[word])
 		}
 		df = 0 //clear memory
 		
@@ -223,7 +225,7 @@ function Classifier(){
 			let vector = category_vectors[category]
 			for (let word in vector) {
 				let tf = vector[word]
-				let word_idf = idf[word]
+				let word_idf = this.idf[word]
 				vector[word] = tf * word_idf
 			}
 			this.category_tfidf[category] = vector
@@ -235,8 +237,11 @@ function Classifier(){
 	this.classify = function(text){
 		let vector = {}
 		for(let token of text.toLowerCase().match(this.wordFinder)){ //tokenize
+			console.log("token: " + token)
 			if (this.wordlist.hasOwnProperty(token)) { //check that words are valid
+				console.log("in word list: " + token)
 				if (this.idf.hasOwnProperty(token)) { //find those that exist in the categories
+					console.log("in idf: " + token)
 					if (vector.hasOwnProperty(token)) { //add to assoc array
 						vector[word] += 1
 					}else{
@@ -245,17 +250,19 @@ function Classifier(){
 				}
 			}
 		}
+		console.log(vector)
 		//TF-IDF
 		for (let word in vector) {
 			let tf = Math.log(vector[word])
 			let word_idf = this.idf[word]
 			vector[word] = tf * word_idf
 		}
+		console.log(vector)
 		//Now cosine similarity
 		let results = []
 		
 		for (let category in this.category_tfidf) {
-			let category_vector = category_tfidf[category]
+			let category_vector = this.category_tfidf[category]
 			
 			//dot product
 			let dot_product = 0
@@ -282,9 +289,9 @@ function Classifier(){
 			}
 			
 		}
-		
-		results = ranking.sort(sort_descending_by_second_element)
-		results = ranking.slice(0, 5)
+		console.log(results)
+		results = results.sort(sortDescendingBySecondElement)
+		results = results.slice(0, 5)
 		return results
 	}
 	
