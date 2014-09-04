@@ -237,15 +237,15 @@ function Classifier(){
 	this.classify = function(text){
 		let vector = {}
 		for(let token of text.toLowerCase().match(this.wordFinder)){ //tokenize
-			console.log("token: " + token)
+			//console.log("token: " + token)
 			if (this.wordlist.hasOwnProperty(token)) { //check that words are valid
-				console.log("in word list: " + token)
+				//console.log("in word list: " + token)
 				if (this.idf.hasOwnProperty(token)) { //find those that exist in the categories
-					console.log("in idf: " + token)
+					//console.log("in idf: " + token)
 					if (vector.hasOwnProperty(token)) { //add to assoc array
-						vector[word] += 1
+						vector[token] += 1
 					}else{
-						vector[word] = 1
+						vector[token] = 1
 					}
 				}
 			}
