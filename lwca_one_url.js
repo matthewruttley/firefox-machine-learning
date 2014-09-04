@@ -183,8 +183,6 @@ function Classifier(){
 		for (let word of dict.split("\n")) {
 			this.wordlist[word] = 1
 		}
-		explain(this.wordlist, "wordlist")
-		console.log(Object.keys(this.wordlist).slice(0, 10))
 		
 		this.wordFinder = RegExp("[a-z]{3,}", "g") //to find words in a sentence
 		
@@ -213,10 +211,12 @@ function Classifier(){
 			category_vectors[category] = tf //add to main object
 		}
 		
-		let N = category_vectors.length
+		let N = Object.keys(category_vectors).length
 		this.idf = {} //calculate IDF for each word
+		count = 0
 		for (let word in df) {
 			this.idf[word] = Math.log(N/df[word])
+			count += 1
 		}
 		df = 0 //clear memory
 		
@@ -237,27 +237,24 @@ function Classifier(){
 	this.classify = function(text){
 		let vector = {}
 		for(let token of text.toLowerCase().match(this.wordFinder)){ //tokenize
-			//console.log("token: " + token)
-			if (this.wordlist.hasOwnProperty(token)) { //check that words are valid
-				//console.log("in word list: " + token)
+			//if (this.wordlist.hasOwnProperty(token)) { //check that words are valid
 				if (this.idf.hasOwnProperty(token)) { //find those that exist in the categories
-					//console.log("in idf: " + token)
 					if (vector.hasOwnProperty(token)) { //add to assoc array
 						vector[token] += 1
 					}else{
 						vector[token] = 1
 					}
 				}
-			}
+			//}
 		}
 		console.log(vector)
 		//TF-IDF
-		for (let word in vector) {
-			let tf = Math.log(vector[word])
-			let word_idf = this.idf[word]
-			vector[word] = tf * word_idf
-		}
-		console.log(vector)
+		//for (let word in vector) {
+		//	let tf = 1+ Math.log(vector[word])
+		//	let word_idf = this.idf[word]
+		//	vector[word] = tf * word_idf
+		//}
+		//console.log(vector)
 		//Now cosine similarity
 		let results = []
 		
@@ -273,7 +270,7 @@ function Classifier(){
 				if (category_vector.hasOwnProperty(word)) {
 					let v_w = vector[word]
 					let c_w = category_vector[word]
-					dot_product += v_w * c_w
+					dot_product += (v_w * c_w)
 					mag1 += Math.pow(v_w, 2)
 					mag2 += Math.pow(c_w, 2)
 				}
@@ -289,7 +286,7 @@ function Classifier(){
 			}
 			
 		}
-		console.log(results)
+		//console.log(results)
 		results = results.sort(sortDescendingBySecondElement)
 		results = results.slice(0, 5)
 		return results
@@ -298,3 +295,4 @@ function Classifier(){
 }
 
 exports.Classifier = Classifier
+
