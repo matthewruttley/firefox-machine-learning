@@ -534,6 +534,86 @@ def classify_sessions(cls_type="freebase", kw_type='kws'):
 	
 	print "Done"
 
+from nltk.corpus import wordnet as wn
+
+def nounerize(thing):
+	"""Tries to turn non-nouns into nouns"""
+	drf = defaultdict(int) #derivationally related forms
+	
+	ss = wn.synsets(thing)
+	for thing in ss:
+		if thing.pos != "n":
+			lemmas = thing.lemmas
+			for lemma in lemmas:
+				for form in lemma.derivationally_related_forms():
+					drf[form.name] += 1 
+	
+	return drf if len(drf) > 0 else None
+
+class PostProcessor:
+	def __init__(self):
+		"""Loads in Ed and Olivier's domainRules.json file, now converted to a big (7k+ entry) dict object"""
+		#import domainRules.json
+		from domain_rules import domain_rules
+		from tldextract.tldextract import extract
+		self.extract = extract
+		from nltk.stem.porter import PorterStemmer as PorterStemmer
+		self.domain_rules = domain_rules
+		#create stemmer
+		self.Stemmer = PorterStemmer()
+		
+	def rerank(self, url, text, results):
+		"""Processes classified results"""
+		
+		#check if the domain exists in domainrules
+		domain = self.extract(url)
+		domain = domain.domain + "." + domain.suffix
+		
+		print "Extracted domain: {0}".format(domain)
+		
+		if domain in self.domain_rules:
+			print "found domain"
+			if "__ANY" in self.domain_rules[domain]:
+				categories = self.domain_rules[domain]['__ANY']
+				for cat in categories:
+					#stem it
+					matchers = [self.Stemmer.stem(cat)]
+					if "-" in matchers[0]:
+						matchers.append(matchers[0].replace("-", "_"))
+					print "Matchers: {0}".format(matchers)
+					for matcher in matchers:
+						for x in range(len(results)):
+							if matcher.lower() in results[x][0].lower():
+								print "{0} with score {1} contains {2}".format(results[x][0], results[x][1], matcher)
+								results[x][1]  = results[x][1] + 1
+								print "score is now {0}".format(results[x][1])
+		else:
+			print "augmenting common words"
+			#check for common words
+			words = defaultdict(int)
+			for result in results:
+				tokens = re.findall("[a-z]+", result[0].lower())
+				for token in tokens:
+					words[token] += 1
+			
+			#remove single entries
+			for k,v in words.iteritems():
+				if v > 1:
+					for x in range(len(results)):
+						matchers = [self.Stemmer.stem(k)]
+						if "-" in matchers[0]:
+							matchers.append(matchers[0].replace("-", "_"))
+						print "Matchers: {0}".format(matchers)
+						for matcher in matchers:
+							if matcher in results[x][0]:
+								print "{0} with score {1} contains {2} which has score {3}".format(results[x][0], results[x][1], matcher, v)
+								results[x][1] = results[x][1] + v
+								print "score is now {0}".format(results[x][1])
+		
+		return sorted(results, key=lambda x:x[1], reverse=True)
+
+	
+
 if __name__ == '__main__':
 	print "=========================="
 	print "++ mruttley - LWCA Demo v0.4 ++"
@@ -545,7 +625,9 @@ if __name__ == '__main__':
 	4. Classify all titles using IAB keywords
 	5. Classify all titles+queries using IAB keywords
 	6. Classify all titles using IAB bigrams
-	7. Classify all titles+queries using IAB bigrams"""
+	7. Classify all titles+queries using IAB bigrams
+	8. Classify text one-by-one with ii and result post-processing"""
+	
 	if len(argv) > 1:
 		decision = argv[1]
 	else:
@@ -571,6 +653,25 @@ if __name__ == '__main__':
 	elif "7" in decision: #iab bigrams + titles + queries
 		classify_session_queries(cls_type="iab_bigrams", kw_type='bigrams')
 		call(["open", "sessions.html"])
+	elif "8" in decision:
+		print "Importing payload...",
+		o = Ontology('payload.lwca')
+		print "building index...."
+		o.build_inverse_index()
+		print "done."
+		p = PostProcessor()
+		while True:
+			url = raw_input("URL: ")
+			text = raw_input("Title and/or Text: ")
+			start = datetime.now()
+			classification = o.classify_webpage_with_ii(text)
+			end = datetime.now()
+			delta = end-start
+			classification = p.rerank(url, text, classification)
+			#now post-process the classification
+			#is the domain in domainRules?
+			print u"({1}.{2} seconds) Top categories: {0}".format(u', '.join(['-'.join([unicode(y) for y in x]) for x in classification]), delta.seconds, delta.microseconds)
+			print "---"
 	else:
 		print "Importing payload...",
 		o = Ontology('payload.lwca')
