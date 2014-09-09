@@ -36,8 +36,31 @@ function removePersistentTitleComponents(url, title) {
 
 // Post Processing
 
-function augmentRepeatWords(args) {
-	//code
+function augmentRepeatWords(results) {
+	//Adds 1 to the score of any result containing a repeated word
+	
+	wordCounts = {}
+	for (i=0;i<results.length;i++) {
+		tokens = results[i][0].toLowerCase().match(wordFinder)
+		for (let token of tokens) {
+			if (wordCounts.hasOwnProperty(token)==false) {
+				wordCounts[token] = 0
+			}
+			wordCounts[token] += 1
+		}
+	}
+	
+	//now go through again and find the repeats
+	for (i=0;i<results.length;i++) {
+		tokens = results[i][0].toLowerCase().match(wordFinder)
+		for (let token of tokens) {
+			if (wordCounts[token] > 1) { //must be a repeat
+				results[i][1] += 1
+			}
+		}
+	}
+	
+	return results
 }
 
 function augmentDomainMatchers(url, title, results) {
