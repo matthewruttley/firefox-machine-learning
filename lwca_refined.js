@@ -7,6 +7,28 @@
 // - Classification
 // - Post-processing
 
+
+function LWCAClassifier(){
+	// Main handler class
+	
+	//Initialize various processors
+	let cdb = ComponentDatabase() //helps match title components and query variables
+	
+	
+	//Handle requests
+	this.classify = function(url, title){
+		
+		//pre process
+		
+		//classify
+		
+		//post process
+		
+		//finish up
+		
+	}
+}
+
 // Pre-processors
 
 function spotDefinites(url, title){
@@ -14,7 +36,7 @@ function spotDefinites(url, title){
 	//e.g. "real estate" is definitely real estate
 	
 	let definites = {
-		"real estate": "Real Estate"
+		"real estate": "Real Estate", //TODO: moarr
 	}
 	
 	for (let definiteMatch of definites) {
@@ -26,13 +48,107 @@ function spotDefinites(url, title){
 	return false //false if nothing found
 }
 
-function removePersistentTitleComponents(url, title) {
-	//Removes common suffixes such as " - Google Search"
+function ComponentDatabase() {
+	//creates a database of known query variables and persistent title components
+	
+	//initialization
+	this.queryVariables = {}
+	this.persistentTitleComponents = {}
+	let history = getHistory()
+	
+	//try and do the two together
+	//arrange visits by domain
+	let domain_titles = {}
+	for (let visit of history){
+		
+		url = parseUri(url)
+		let domain = url.host
+		
+		//scan components
+		for (let var_name in url.queryKey) {
+			if (spaceFinder.test(url.queryKey[var_name])) {
+				//Note: the following spaghetti is why you use a decent language like python
+				//with sets/defaultdicts
+				if (this.queryKey.hasOwnProperty(domain) == false) {
+					this.queryKey[domain] = {}
+				}
+				if (this.queryKey[domain].hasOwnProperty(var_name) == false) {
+					this.queryKey[domain][var_name] = 0
+				}
+				this.queryKey[domain][var_name] += 1
+			}
+		}
+		
+		//sort title
+		if (domain_titles.hasOwnProperty(domain)==false) {
+			domain_titles[domain] = []
+		}
+		domain_titles[domain].push(visit[1])
+	}
+	
+	//what are the most common suffixes?
+	for (let domain in domain_titles){
+		let suffixes = {}
+		let titles = domain_titles[domain]
+		for (x=0;x<titles.length;x++){
+			for (y=x;y<titles.length;y++){
+				if (x!=y) {
+					let lcns = longestCommonNgramSuffix(titles[x], titles[x+1])
+					if (lcns!=false) {
+						if (suffixes.hasOwnProperty(lcns) == false) {
+							suffixes[lcns] = 0
+						}
+						suffixes[lcns] += 1
+					}
+				}
+			}
+		}
+		//eliminate those that only appear once 
+		let to_add = []
+		for (let suffix in suffixes) {
+			let count = suffixes[suffix]
+			if (count > 1) {
+				to_add.push(suffix)
+			}
+		}
+		//to_add must be sorted in descending order of length
+		//as largest matches should be eliminated first
+		to_add = to_add.sort(sortDescendingByElementLength)
+		this.persistentTitleComponents[domain] = to_add
+	}
+	
 }
 
-
+function removePersistentTitleComponents(url, title, cdb){
+	//Removes common title endings such as " - Google Search" using the component database
+	
+	domain = getDomain(url)
+	if (cdb.hasOwnProperty(domain)) {
+		for (let suffix in cdb[domain]) {
+			if (title.endsWith(suffix)) {
+				//chop suffix from end
+				title = title.slice(0, visit[1].length-suffix-length)
+				break
+			}
+		}
+	}
+	
+	return title
+}
 
 // Classification
+
+function ClassificationEngine(){
+	//a class that can classify a visit 
+	
+	//initializer
+	//import payload
+	
+	//classifier
+	this.classify = function(){
+		
+	}
+}
 
 // Post Processing
 
@@ -243,7 +359,7 @@ function augmentQueries(url, results, queryDatabase) {
 	return results
 }
 
-function post_processing_rerank(url, results, qdb) {
+function postProcessingRerank(url, results, qdb) {
 	//wangs the results through the post-processing functions
 	
 	results = augmentQueries(url, results, qdb)
@@ -251,11 +367,12 @@ function post_processing_rerank(url, results, qdb) {
 	results_domain = augmentDomainMatchers(results)
 	if (results == results_domain) { //i.e. no change
 		results = augmentRepeatWords(results)
-		return results
 	}else{
-		return results_domain
+		results = results_domain
 	}
 
+	//now sort
+	results = results.sort(sortDescendingBySecondElement)
 }
 
 // Auxiliary Functions
@@ -366,4 +483,27 @@ String.prototype.endsWith = function(suffix) {
     return this.indexOf(suffix, this.length - suffix.length) !== -1;
 };
 
-var wordFinder = RegExp("[a-z]{3,}", "g")
+var wordFinder = RegExp("[a-z]{3,}", "g") //tokenizes english sentences
+var spaceFinder = RegExp(/.+(%20|\+|\s).+/g) //finds get variable values that have spaces in them
+//bizarrely, if spaceFinder is declared in the way wordFinder is (two args), it returns an error. Oh JS...
+
+function sortDescendingBySecondElement(first, second) {
+	//function to be used in sort(some_function)
+	//does what it says on the tin
+	first = first[1]
+	second = second[1]
+	if (first == second) {
+		return 0
+	}else{
+		if (first > second) {
+			return false
+		}else{
+			return true
+		}
+	}	
+}
+
+function sortDescendingByElementLength(first, second) {
+	//sorting function to sort a list of strings
+	return second.length - first.length
+}
