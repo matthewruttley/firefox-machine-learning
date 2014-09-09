@@ -112,6 +112,7 @@ function augmentDomainMatchers(url, title, results) {
 	}
 	
 	url = parseUri(url)
+	title = title.toLowerCase()
 	//have to basically iteratively check if bits of the url are in domainRules
 	//e.g. http://something.search.domain.com should first search for everything,
 	//then search.domain.com, then domain.com
@@ -119,7 +120,7 @@ function augmentDomainMatchers(url, title, results) {
 	
 	domain = url.host.split(".")
 	for (let dot_count in domain){
-		key = domain.slice(domain.length-dot_count).join(".")
+		key = domain.slice(dot_count).join(".")
 		if (domainRules.hasOwnProperty(key)) {
 			//found an entry in domainRules
 			
@@ -136,16 +137,58 @@ function augmentDomainMatchers(url, title, results) {
 			//		"tag nintendowiiu" : "video-games"
 			//	 },
 			
-			classification = domainRules[key].sort()
+			category_matchers = domainRules[key]
+			decision = false
+			keys = Object.keys(category_matchers).sort()
 			
+			//iterate through all keys, __ANY comes last to see if one matches
+			for (let k in Object.keys(category_matchers)) {
+				if (k != "__ANY") {
+					tokens = k.split(" ")
+					match_count = 0
+					if (title.indexOf(token)!=-1) {
+						match_count += 1
+					}
+					if (match_count == tokens.length) {
+						decision = category_matchers[k]
+						break
+					}
+				}
+			}
 			
+			//check if decision was made
+			if (decision == false) {
+				if (category_matchers.hasOwnProperty("__ANY")) { //if not, look at __ANY
+					decision = category_matchers['__ANY']
+				}else{
+					return results //if there's still nothing, just return the original results from the argument
+				}
+			}
 			
+			//now try and rerank results based on components
+			if(typeof decision === "string"){ //decision could be 1 or more categories, make it consistent
+				decision = [decision]
+			}
 			
+			//now iterate through the decision categories and add 1 to each result
+			//category that contains the stems
 			
+			for(let category of decision){
+				if (class_maps.hasOwnProperty(category)) {
+					for (i=0;i<results.length;i++) {
+						for (let stem of class_maps[category]) {
+							if (results[i][0].toLowerCase().indexOf(stem) != -1) {
+								results[i][1] += 1
+								break
+							}
+						}
+					}
+				}
+			}
 			break
 		}
 	}
-	
+	return results
 }
 
 function augmentQueries(url, results, queryDatabase) {
