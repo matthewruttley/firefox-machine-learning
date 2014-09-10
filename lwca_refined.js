@@ -29,15 +29,26 @@ function LWCAClassifier(){
 			console.log("Pre processing")
 			//shortcuts
 			let sd = spotDefinites(url, title)
-			if (sd) { return sd }
+			if (sd) {
+				console.log("Spotted definite match")
+				return sd
+			}
 		
 			//cleaning
+			console.log("title before cleaning: " + title)
 			title = removePersistentTitleComponents(url, title, cdb.persistentTitleComponents)
+			console.log("after: " + title)
 		
 		//classify
 			console.log("Classifying")
+			
+			console.log("Payload size is: " + Object.keys(payload).length)
+			console.log("DomainRules size is: " + Object.keys(domainRules).length)
+			
 			//cosine similarity
 			let scores = ce.classify(url, title)
+			
+			console.log("scores: " + scores)
 			
 			if (scores.length == 0) {
 				return false
@@ -46,18 +57,25 @@ function LWCAClassifier(){
 		//post process
 			console.log("Post processing")
 			
+			console.log('looking for domain scores')
 			let domain_scores = augmentDomainMatchers(url, title, scores)
-			if (domain_scores === scores) {
+			if (domain_scores != scores) {
+				console.log('adjusted!')
 				return domain_scores.sort(sortDescendingBySecondElement)[0]
 			}
 			
 			//if that didn't change anything, last resort is using queries and repeats
+			console.log("trying query augmentation")
 			scores = augmentQueries(url, scores, cdb.queryVariables)
+			console.log('scores: ' + scores)
+			console.log("trying query augmentation")
 			scores = augmentRepeatWords(scores)
+			console.log('scores: ' + scores)
 		
 		//finish up
 			console.log("Finishing up")
 			return scores.sort(sortDescendingBySecondElement)[0]
+		
 	}
 }
 
@@ -213,7 +231,7 @@ function cosineSimilarity(text, category_keywords){
 	let denominator = Math.sqrt(mag1) * Math.sqrt(mag2)
 	
 	if (denominator != 0) {
-		return dot_product / denom
+		return dot_product / denominator
 	}
 	
 	return 0
@@ -224,15 +242,22 @@ function ClassificationEngine(){
 	
 	//initializer
 	
-	//possible pruning
-	// - must have (25?) keys
+	let categories = []
+	for(let k of Object.keys(payload)){
+		if (Object.keys(payload[k]).length >= 25) { //pruning
+			categories.push(k)
+		}
+	}
+	
+	console.log("payload cats before pruner: " + Object.keys(payload).length + " and after: " + categories.length)
+	
+	//possible further pruning
 	// - must contain a unique key
 	
 	//build inverse index
 	this.id_to_article = {}
 	this.inverse_index = {}
 	
-	let categories = Object.keys(payload)
 	for(let index=0;index<categories.length;index++){
 		category = categories[index]
 		keywords = payload[category]
@@ -246,12 +271,16 @@ function ClassificationEngine(){
 			}
 		}
 	}
-
+	
+	console.log("inverse index is of size: " + Object.keys(this.inverse_index).length + " and id_to_article is " + Object.keys(this.id_to_article).length)
 	
 	//classifier
 	this.classify = function(url, title){
 		
 		title = title.toLowerCase().match(wordFinder)
+		
+		console.log("title before classification: ")
+		console.log(title)
 		
 		let matches = []
 		
@@ -267,6 +296,8 @@ function ClassificationEngine(){
 				}
 			}
 		}
+		
+		console.log("total number of articles to look at: " + Object.keys(articles).length)
 		
 		let scores = [] //classify against each category
 		for (let article_number in articles) {
