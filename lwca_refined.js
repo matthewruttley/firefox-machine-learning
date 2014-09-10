@@ -7,6 +7,11 @@
 // - Classification
 // - Post-processing
 
+//How to use? Simply:
+// > var lwca = new LWCAClassifier()
+// > lwca.classify("http://www.bbc.com/some_very_interesting_article", "Apple reveals shiny new gadget")
+// >>> ['computers', 0.75]
+
 
 function LWCAClassifier(){
 	// Main handler class
@@ -138,19 +143,111 @@ function removePersistentTitleComponents(url, title, cdb){
 
 // Classification
 
+function cosineSimilarity(text, category_keywords){
+	//calculates the cosine similarity between the two arguments
+	//expects text to be an array of strings
+	//expects category_keywords to be an object of string: int
+	//returns a float
+	
+	//create vector
+	let vector = {} //object of word: [text count, category count]
+	for (let word of text) {
+		if (category_keywords.hasOwnProperty(word)) {
+			if (vector.hasOwnProperty(word)) {
+				vector[word][0] += 1
+			}else{
+				vector[word] = [1, category_keywords[word]]
+			}
+		}
+	}
+	
+	//calculate dot product
+	
+	let dot_product = 0
+	let mag1 = 0
+	let mag2 = 0
+	
+	for(let word of vector){
+		dot_product += (vector[word][0] * vector[word][1])
+		mag1 += Math.pow(vector[word][0], 2)
+		mag2 += Math.pow(vector[word][1], 2)
+	}
+	
+	let denominator = Math.sqrt(mag1) * Math.sqrt(mag2)
+	
+	if (denominator != 0) {
+		return dot_product / denom
+	}
+	
+	return 0
+}
+
 function ClassificationEngine(){
 	//a class that can classify a visit 
 	
 	//initializer
-	//import payload
+	this.init = function(){
+		//possible pruning
+		// - must have (25?) keys
+		// - must contain a unique key
+		
+		//build inverse index
+		this.id_to_article = {}
+		this.inverse_index = {}
+		
+		let categories = Object.keys(payload)
+		for(index=0;index<categories.length;index++){
+			category = categories[i]
+			keywords = payload[category]
+			
+			this.id_to_article[index] = category
+			for(let k in keywords){
+				if (this.inverse_index.hasOwnProperty(k)==false) {
+					this.inverse_index[k] = [index]
+				}else{
+					this.inverse_index[k].push(index)
+				}
+			}
+		}
+	}
 	
 	//classifier
-	this.classify = function(){
+	this.classify = function(url, title){
 		
+		title = title.toLowerCase().match(wordFinder)
+		
+		let matches = []
+		
+		//can't do the actual intersection since cosim doesn't need exact matches.
+		//just needs articles with at least 1 of the matches
+		
+		articles = {} // a set of articles worth looking at, auto-deduped
+		
+		for (let keyword in title) { //set intersection
+			for (let article of this.inverse_index[keyword]) {
+				if (articles.hasOwnProperty(article)==false) {
+					articles[article] = true 
+				}
+			}
+		}
+		
+		let scores = [] //classify against each category
+		for (let article_number in articles) {
+			let category = this.id_to_article[article_number]
+			let words = payload[category]
+			let similarity = cosineSimilarity(title, words)
+			if (similarity != 0) {
+				scores.push([category, similarity])
+			}
+		}
+		
+		scores = scores.sort(sortDescendingBySecondElement)
+		return scores.slice(0, 10)
 	}
+	
 }
 
-// Post Processing
+// Post processing
 
 function augmentRepeatWords(results) {
 	//Adds 1 to the score of any result containing a repeated word
@@ -375,10 +472,12 @@ function postProcessingRerank(url, results, qdb) {
 	results = results.sort(sortDescendingBySecondElement)
 }
 
-// Auxiliary Functions
-const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
+// Auxiliary functions, matchers, options etc
 
-const {domainRules} = require("domainRules.json") //TODO: debug accessing this file
+const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
+let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
+scriptLoader.loadSubScript("domainRules.json"); //TODO: test this, also clean up the file
+scriptLoader.loadSubScript("payload.json"); //TODO: test this
 
 function getDomain(url) {
 	//returns the (sub)domain of a url
