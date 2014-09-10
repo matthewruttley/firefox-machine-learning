@@ -24,6 +24,8 @@ function LWCAClassifier(){
 	this.classify = function(url, title){
 		
 		//pre process
+			title = title.toLowerCase()
+			
 			console.log("Pre processing")
 			//shortcuts
 			let sd = spotDefinites(url, title)
@@ -69,7 +71,7 @@ function spotDefinites(url, title){
 		"real estate": "Real Estate", //TODO: moarr
 	}
 	
-	for (let definiteMatch of definites) {
+	for (let definiteMatch in definites) {
 		if (title.indexOf(definiteMatch) != -1) {
 			return definites[definiteMatch]
 		}
@@ -202,7 +204,7 @@ function cosineSimilarity(text, category_keywords){
 	let mag1 = 0
 	let mag2 = 0
 	
-	for(let word of vector){
+	for(let word in vector){
 		dot_product += (vector[word][0] * vector[word][1])
 		mag1 += Math.pow(vector[word][0], 2)
 		mag2 += Math.pow(vector[word][1], 2)
@@ -231,8 +233,8 @@ function ClassificationEngine(){
 	this.inverse_index = {}
 	
 	let categories = Object.keys(payload)
-	for(index=0;index<categories.length;index++){
-		category = categories[i]
+	for(let index=0;index<categories.length;index++){
+		category = categories[index]
 		keywords = payload[category]
 		
 		this.id_to_article[index] = category
