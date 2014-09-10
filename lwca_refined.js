@@ -12,19 +12,19 @@
 // > lwca.classify("http://www.bbc.com/some_very_interesting_article", "Apple reveals shiny new gadget")
 // >>> ['computers', 0.75]
 
-
 function LWCAClassifier(){
 	// Main handler class
 	
 	//Initialize various processors
-	let cdb = ComponentDatabase() //helps match title components and query variables
-	let ce = ClassificationEngine()
+	console.log("Initializing...")
+	let cdb = new ComponentDatabase() //helps match title components and query variables
+	let ce = new ClassificationEngine()
 	
 	//Handle requests
 	this.classify = function(url, title){
 		
 		//pre process
-	
+			console.log("Pre processing")
 			//shortcuts
 			let sd = spotDefinites(url, title)
 			if (sd) { return sd }
@@ -33,12 +33,17 @@ function LWCAClassifier(){
 			title = removePersistentTitleComponents(url, title, cdb.persistentTitleComponents)
 		
 		//classify
-		
+			console.log("Classifying")
 			//cosine similarity
 			let scores = ce.classify(url, title)
+			
+			if (scores.length == 0) {
+				return false
+			}
 		
 		//post process
-		
+			console.log("Post processing")
+			
 			let domain_scores = augmentDomainMatchers(url, title, scores)
 			if (domain_scores === scores) {
 				return domain_scores.sort(sortDescendingBySecondElement)[0]
@@ -49,6 +54,7 @@ function LWCAClassifier(){
 			scores = augmentRepeatWords(scores)
 		
 		//finish up
+			console.log("Finishing up")
 			return scores.sort(sortDescendingBySecondElement)[0]
 	}
 }
@@ -83,8 +89,11 @@ function ComponentDatabase() {
 	//try and do the two together
 	//arrange visits by domain
 	let domain_titles = {}
+
+	history_total = 0
 	for (let visit of history){
 		
+		url = visit[0]
 		url = parseUri(url)
 		let domain = url.host
 		
@@ -93,13 +102,13 @@ function ComponentDatabase() {
 			if (spaceFinder.test(url.queryKey[var_name])) {
 				//Note: the following spaghetti is why you use a decent language like python
 				//with sets/defaultdicts
-				if (this.queryKey.hasOwnProperty(domain) == false) {
-					this.queryKey[domain] = {}
+				if (this.queryVariables.hasOwnProperty(domain) == false) {
+					this.queryVariables[domain] = {}
 				}
-				if (this.queryKey[domain].hasOwnProperty(var_name) == false) {
-					this.queryKey[domain][var_name] = 0
+				if (this.queryVariables[domain].hasOwnProperty(var_name) == false) {
+					this.queryVariables[domain][var_name] = 0
 				}
-				this.queryKey[domain][var_name] += 1
+				this.queryVariables[domain][var_name] += 1
 			}
 		}
 		
@@ -107,17 +116,23 @@ function ComponentDatabase() {
 		if (domain_titles.hasOwnProperty(domain)==false) {
 			domain_titles[domain] = []
 		}
-		domain_titles[domain].push(visit[1])
+		
+		if (visit[1] != null) {
+			domain_titles[domain].push(visit[1])
+		}
+		history_total += 1
 	}
+	console.log("Total history items loaded: " + history_total)
 	
+	console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
 	//what are the most common suffixes?
 	for (let domain in domain_titles){
 		let suffixes = {}
 		let titles = domain_titles[domain]
-		for (x=0;x<titles.length;x++){
-			for (y=x;y<titles.length;y++){
-				if (x!=y) {
-					let lcns = longestCommonNgramSuffix(titles[x], titles[x+1])
+		for (let x=0;x<titles.length;x++){
+			for (let y=x+1;y<titles.length;y++){
+				if (titles[x]!=titles[y]) {
+					let lcns = longestCommonNgramSuffix(titles[x], titles[y])
 					if (lcns!=false) {
 						if (suffixes.hasOwnProperty(lcns) == false) {
 							suffixes[lcns] = 0
@@ -125,6 +140,7 @@ function ComponentDatabase() {
 						suffixes[lcns] += 1
 					}
 				}
+				
 			}
 		}
 		//eliminate those that only appear once 
@@ -140,7 +156,7 @@ function ComponentDatabase() {
 		to_add = to_add.sort(sortDescendingByElementLength)
 		this.persistentTitleComponents[domain] = to_add
 	}
-	
+	console.log('Done!')
 }
 
 function removePersistentTitleComponents(url, title, cdb){
@@ -478,9 +494,10 @@ function augmentQueries(url, results, queryDatabase) {
 // Auxiliary functions, matchers, options etc
 
 const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
+const {data} = require("sdk/self"); //not quite sure why this is necessary
 let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
-scriptLoader.loadSubScript("domainRules.json"); //TODO: test this, also clean up the file
-scriptLoader.loadSubScript("payload.json"); //TODO: test this
+scriptLoader.loadSubScript(data.url("domainRules.json")); //TODO: test this, also clean up the file
+scriptLoader.loadSubScript(data.url("payload.json")); //TODO: test this
 
 function getDomain(url) {
 	//returns the (sub)domain of a url
@@ -565,9 +582,10 @@ function longestCommonNgramSuffix(s1, s2){
 	min_len = s1.length < s2.length ? s1.length : s2.length
 	
 	result = false
-	for (x=1;x<min_len+1;x++){
-		if (s1[s1.length-x] != s2[s2.length-x]) {
-			result = s1.slice(s1.length-x+1)
+	for (let a=1;a<min_len+1;a++){
+		if (s1[s1.length-a] != s2[s2.length-a]) {
+			result = s1.slice(s1.length-a+1)
+			break
 		}
 	}
 	
@@ -609,3 +627,5 @@ function sortDescendingByElementLength(first, second) {
 	//sorting function to sort a list of strings
 	return second.length - first.length
 }
+
+exports.LWCAClassifier = LWCAClassifier //for the extension main.js to access
