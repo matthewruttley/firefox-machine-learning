@@ -18,19 +18,38 @@ function LWCAClassifier(){
 	
 	//Initialize various processors
 	let cdb = ComponentDatabase() //helps match title components and query variables
-	
+	let ce = ClassificationEngine()
 	
 	//Handle requests
 	this.classify = function(url, title){
 		
 		//pre process
+	
+			//shortcuts
+			let sd = spotDefinites(url, title)
+			if (sd) { return sd }
+		
+			//cleaning
+			title = removePersistentTitleComponents(url, title, cdb.persistentTitleComponents)
 		
 		//classify
 		
+			//cosine similarity
+			let scores = ce.classify(url, title)
+		
 		//post process
 		
-		//finish up
+			let domain_scores = augmentDomainMatchers(url, title, scores)
+			if (domain_scores === scores) {
+				return domain_scores.sort(sortDescendingBySecondElement)[0]
+			}
+			
+			//if that didn't change anything, last resort is using queries and repeats
+			scores = augmentQueries(url, scores, cdb.queryVariables)
+			scores = augmentRepeatWords(scores)
 		
+		//finish up
+			return scores.sort(sortDescendingBySecondElement)[0]
 	}
 }
 
@@ -186,30 +205,30 @@ function ClassificationEngine(){
 	//a class that can classify a visit 
 	
 	//initializer
-	this.init = function(){
-		//possible pruning
-		// - must have (25?) keys
-		// - must contain a unique key
+	
+	//possible pruning
+	// - must have (25?) keys
+	// - must contain a unique key
+	
+	//build inverse index
+	this.id_to_article = {}
+	this.inverse_index = {}
+	
+	let categories = Object.keys(payload)
+	for(index=0;index<categories.length;index++){
+		category = categories[i]
+		keywords = payload[category]
 		
-		//build inverse index
-		this.id_to_article = {}
-		this.inverse_index = {}
-		
-		let categories = Object.keys(payload)
-		for(index=0;index<categories.length;index++){
-			category = categories[i]
-			keywords = payload[category]
-			
-			this.id_to_article[index] = category
-			for(let k in keywords){
-				if (this.inverse_index.hasOwnProperty(k)==false) {
-					this.inverse_index[k] = [index]
-				}else{
-					this.inverse_index[k].push(index)
-				}
+		this.id_to_article[index] = category
+		for(let k in keywords){
+			if (this.inverse_index.hasOwnProperty(k)==false) {
+				this.inverse_index[k] = [index]
+			}else{
+				this.inverse_index[k].push(index)
 			}
 		}
 	}
+
 	
 	//classifier
 	this.classify = function(url, title){
@@ -454,22 +473,6 @@ function augmentQueries(url, results, queryDatabase) {
 	}
 	
 	return results
-}
-
-function postProcessingRerank(url, results, qdb) {
-	//wangs the results through the post-processing functions
-	
-	results = augmentQueries(url, results, qdb)
-
-	results_domain = augmentDomainMatchers(results)
-	if (results == results_domain) { //i.e. no change
-		results = augmentRepeatWords(results)
-	}else{
-		results = results_domain
-	}
-
-	//now sort
-	results = results.sort(sortDescendingBySecondElement)
 }
 
 // Auxiliary functions, matchers, options etc
