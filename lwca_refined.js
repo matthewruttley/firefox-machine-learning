@@ -37,6 +37,7 @@ function LWCAClassifier(){
 			//cleaning
 			console.log("title before cleaning: " + title)
 			title = removePersistentTitleComponents(url, title, cdb.persistentTitleComponents)
+			title = removeDomainNames(url, title) //try to remove domain names
 			console.log("after: " + title)
 		
 		//classify
@@ -68,9 +69,9 @@ function LWCAClassifier(){
 			console.log("trying query augmentation")
 			scores = augmentQueries(url, scores, cdb.queryVariables)
 			console.log('scores: ' + scores)
-			console.log("trying query augmentation")
-			scores = augmentRepeatWords(scores)
-			console.log('scores: ' + scores)
+			//console.log("trying repeat word augmentation")
+			//scores = augmentRepeatWords(scores)
+			//console.log('scores: ' + scores)
 		
 		//finish up
 			console.log("Finishing up")
@@ -194,6 +195,22 @@ function removePersistentTitleComponents(url, title, cdb){
 	}
 	
 	return title
+}
+
+function removeDomainNames(url, title) {
+	//tries to remove the domain name (or aspects of it) from the title
+	url = parseUri(url)
+	url = url.host.split(".")
+	title = title.toLowerCase().match(wordFinder)
+	new_title = []
+	
+	for (let token of title) {
+		if (url.indexOf(token)==-1) {
+			new_title.push(token)
+		}
+	}
+	
+	return new_title.join(" ")
 }
 
 // Classification
@@ -453,6 +470,7 @@ function augmentDomainMatchers(url, title, results) {
 					
 					if (match_count == tokens.length) {
 						decision = category_matchers[k]
+						console.log("Exact token match found")
 						break
 					}
 				}
@@ -461,6 +479,7 @@ function augmentDomainMatchers(url, title, results) {
 			//check if decision was made
 			if (decision == false) {
 				if (category_matchers.hasOwnProperty("__ANY")) { //if not, look at __ANY
+					console.log("No exact title token match found, so going with __ANY, which is: " + category_matchers['__ANY'])
 					decision = category_matchers['__ANY']
 				}else{
 					return results //if there's still nothing, just return the original results from the argument
@@ -497,27 +516,34 @@ function augmentQueries(url, results, queryDatabase) {
 	//Tries to spot any search queries in the url
 	//Doubles the score of anything that contains a search query word
 	
+	console.log("URL: " + url)
+	
 	queries = [] //a list of strings
 	url = parseUri(url) //
 	
 	if (queryDatabase.hasOwnProperty(url.host)) { //if the domain is in the db
+		console.log("Domain: " + url.host + " is in the database")
+		console.log("There are " + Object.keys(url.queryKey).length + " keys in the url")
 		for (let variable in url.queryKey) { //iterate through url get variables
 			if (queryDatabase[url.host].hasOwnProperty(variable)) { //if in the db
 				query = unescape(url.queryKey[variable]) //append to list
-				query = query.match()
 				queries.concat(query.match(wordFinder))
 			}
 		}
 	}
 	
 	//now find any result that contains a query word
-	for(let result in results){
-		for (let word of queries) {
-			if (results[result][0].indexOf(word) != -1) {
-				results[result][1] *= 2 //double the score
+	if (queries.length > 0) {
+		for(let result in results){
+			console.log("Iterating through results")
+			for (let word of queries) {
+				if (results[result][0].indexOf(word) != -1) {
+					results[result][1] *= 2 //double the score
+				}
 			}
 		}
 	}
+	
 	
 	return results
 }
