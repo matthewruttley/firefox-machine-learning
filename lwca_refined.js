@@ -444,9 +444,13 @@ function augmentDomainMatchers(url, title, results) {
 				if (k != "__ANY") {
 					tokens = k.split(" ")
 					match_count = 0
-					if (title.indexOf(token)!=-1) {
-						match_count += 1
+					
+					for (let token of tokens) {
+						if (title.indexOf(token)!=-1) {
+							match_count += 1
+						}
 					}
+					
 					if (match_count == tokens.length) {
 						decision = category_matchers[k]
 						break
