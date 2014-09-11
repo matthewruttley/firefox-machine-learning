@@ -198,7 +198,7 @@ function removePersistentTitleComponents(url, title, cdb){
 
 // Classification
 
-function cosineSimilarity(text, category_keywords){
+function cosineSimilarity(text, category_keywords, category_magnitude){
 	//calculates the cosine similarity between the two arguments
 	//expects text to be an array of strings
 	//expects category_keywords to be an object of string: int
@@ -207,28 +207,28 @@ function cosineSimilarity(text, category_keywords){
 	//create vector
 	let vector = {} //object of word: [text count, category count]
 	for (let word of text) {
-		if (category_keywords.hasOwnProperty(word)) {
-			if (vector.hasOwnProperty(word)) {
-				vector[word][0] += 1
+		if (vector.hasOwnProperty(word)==false) {
+			if (category_keywords.hasOwnProperty(word)==false) {
+				vector[word] = [1, 0]
 			}else{
 				vector[word] = [1, category_keywords[word]]
-			}
+			}	
+		}else{
+			vector[word][0] += 1
 		}
 	}
 	
 	//calculate dot product
 	
 	let dot_product = 0
-	let mag1 = 0
-	let mag2 = 0
+	let text_vector_magnitude = 0
 	
 	for(let word in vector){
 		dot_product += (vector[word][0] * vector[word][1])
-		mag1 += Math.pow(vector[word][0], 2)
-		mag2 += Math.pow(vector[word][1], 2)
+		text_vector_magnitude += Math.pow(vector[word][0], 2)
 	}
 	
-	let denominator = Math.sqrt(mag1) * Math.sqrt(mag2)
+	let denominator = Math.sqrt(text_vector_magnitude) * category_magnitude
 	
 	if (denominator != 0) {
 		return dot_product / denominator
@@ -249,18 +249,18 @@ function ClassificationEngine(){
 		}
 	}
 	
-	console.log("payload cats before pruner: " + Object.keys(payload).length + " and after: " + categories.length)
-	
 	//possible further pruning
 	// - must contain a unique key
 	
-	//build inverse index
+	//build inverse index and magnitudes
 	this.id_to_article = {}
 	this.inverse_index = {}
+	this.magnitudes = {} //note that magnitudes are based on article ids, not category names
 	
 	for(let index=0;index<categories.length;index++){
-		category = categories[index]
-		keywords = payload[category]
+		let category = categories[index]
+		let keywords = payload[category]
+		let magnitude = 0
 		
 		this.id_to_article[index] = category
 		for(let k in keywords){
@@ -269,44 +269,38 @@ function ClassificationEngine(){
 			}else{
 				this.inverse_index[k].push(index)
 			}
+			magnitude += Math.pow(keywords[k], 2)
 		}
+		
+		magnitude = Math.sqrt(magnitude) 	//precalculate magnitude square roots
+		this.magnitudes[index] = magnitude
 	}
-	
-	console.log("inverse index is of size: " + Object.keys(this.inverse_index).length + " and id_to_article is " + Object.keys(this.id_to_article).length)
 	
 	//classifier
 	this.classify = function(url, title){
-		
 		title = title.toLowerCase().match(wordFinder)
-		
-		console.log("title before classification: ")
-		console.log(title)
-		
 		let matches = []
-		
-		//can't do the actual intersection since cosim doesn't need exact matches.
-		//just needs articles with at least 1 of the matches
 		
 		articles = {} // a set of articles worth looking at, auto-deduped
 		
-		for (let keyword in title) { //set intersection
-			for (let article of this.inverse_index[keyword]) {
-				if (articles.hasOwnProperty(article)==false) {
-					articles[article] = true 
+		for (let keyword of title) {
+			if (this.inverse_index.hasOwnProperty(keyword)) {
+				for (let article of this.inverse_index[keyword]) {
+					articles[article] = true //effectively the set intersection
 				}
 			}
 		}
 		
-		console.log("total number of articles to look at: " + Object.keys(articles).length)
-		
 		let scores = [] //classify against each category
+		
 		for (let article_number in articles) {
 			let category = this.id_to_article[article_number]
 			let words = payload[category]
-			let similarity = cosineSimilarity(title, words)
+			similarity = cosineSimilarity(title, words, this.magnitudes[article_number])
 			if (similarity != 0) {
 				scores.push([category, similarity])
 			}
+			
 		}
 		
 		scores = scores.sort(sortDescendingBySecondElement)
