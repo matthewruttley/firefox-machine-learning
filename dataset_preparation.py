@@ -16,6 +16,7 @@ from collections import defaultdict
 from os import listdir
 from os.path import isdir, exists
 from codecs import open as copen
+from urllib import unquote_plus
 
 #SUBROUTINES
 def find_repositories_on_computer():
@@ -168,7 +169,6 @@ def get_domain(url):
 		return domain
 	else:
 		return None
-	
 
 def remove_persistent_title_components_across_sessions(session_titles):
 	"""Code to remove persistent title components by comparing different titles across sessions
@@ -306,12 +306,13 @@ def scan_for_search_variables(url_data):
 	
 	return search_variables
 
-class QueryFinder:
+class QueryFinderOld:
 	"""A lookup table for domain query variables that is generated
 	based on existing firefox profiles on disk.
-	Set an argument for how many days into the past to scan. 
+	Set an argument for how many days into the past to scan.
+	Eliminates those that only appear once
 	"""
-	def __init__(self, history_length_to_scan):
+	def __init__(self, history_length_to_scan=0):
 		#scan x days of history
 		domain_variables = defaultdict(lambda: defaultdict(int))
 		for dbloc in find_repositories_on_computer():
@@ -333,6 +334,55 @@ class QueryFinder:
 					d[domain] = set(search_vars) #convert list to set for easy lookups
 		#make it accessible
 		self.lookup_table = d
+
+class QueryFinder:
+	"""A lookup table for domain query variables that is generated
+	based on existing firefox profiles on disk.
+	Set an argument for how many days into the past to scan.
+	"""
+	def __init__(self, history_length_to_scan=0):
+		#scan x days of history
+		domain_variables = defaultdict(lambda: defaultdict(int))
+		for dbloc in find_repositories_on_computer():
+			d = get_last_x_days_of_browsing_urls(dbloc, history_length_to_scan, "?")
+			v = scan_for_search_variables(d)
+			#merge
+			for domain, varvalue in v.iteritems():
+				for var, value in varvalue.iteritems():
+					domain_variables[domain][var] += value
+		
+		#convert to a dict of
+		#domain:
+		#		valid: x, y, z
+		#		counts: a:1, b:2, c:3
+		#		
+		d = {}
+		for domain, get_variable in domain_variables.iteritems():
+			search_vars = []
+			for var, value in varvalue.iteritems():
+				if value > 1:#eliminate those with a count of 1
+					search_vars.append(var)
+			if len(search_vars) > 1: #eliminate domains with nothing
+				d[domain] = set(search_vars) #convert list to set for easy lookups
+		#make it accessible
+		self.lookup_table = d
+	
+	#def augment(url, results):
+	#	"""Takes a series of results, [[class, score], ...]
+	#	and doubles the scores of those that contain words from the query"""
+	#	
+	#	sv = scan_for_search_variables([url])
+	#	domain = sv.keys()[0]
+	#	if domain in self.lookup_table:
+	#		query_words = []
+	#		for variable in sv[domain].iterkeys():
+	#			words = unquote_plus()
+	#		
+	#	
+	#	for result in results:
+	#		
+	#	
+	#	
 
 def session_bag_of_words_generator_with_titles():
 	"""A generator that yields strings containing every search
@@ -391,8 +441,6 @@ def session_query_generator():
 						
 		#queries = " ".join(queries)
 		yield queries
-	
-	
 
 def get_search_query(qf_object, url):
 	"""Gets a search query. If none found, returns False"""

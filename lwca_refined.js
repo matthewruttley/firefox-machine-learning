@@ -12,6 +12,8 @@
 // > lwca.classify("http://www.bbc.com/some_very_interesting_article", "Apple reveals shiny new gadget")
 // >>> ['computers', 0.75]
 
+var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is 
+
 function LWCAClassifier(){
 	// Main handler class
 	
@@ -72,6 +74,9 @@ function LWCAClassifier(){
 			//console.log("trying repeat word augmentation")
 			//scores = augmentRepeatWords(scores)
 			//console.log('scores: ' + scores)
+			
+			//convert from Wiki to IAB v2
+			scores = convertWikiToIAB(scores)
 		
 		//finish up
 			console.log("Finishing up")
@@ -147,6 +152,13 @@ function ComponentDatabase() {
 	
 	console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
 	//what are the most common suffixes?
+	
+	//first some sort of stats
+	total_domains = Object.keys(domain_titles).length
+	count = 0
+	increment = total_domains / 100 //TODO
+	
+	//now for processing
 	for (let domain in domain_titles){
 		let suffixes = {}
 		let titles = domain_titles[domain]
@@ -548,13 +560,39 @@ function augmentQueries(url, results, queryDatabase) {
 	return results
 }
 
+function convertWikiToIAB(results, level="top") {
+	//converts a set of wiki categories to IAB categories
+	//options for level are:
+	// - top, lower, all
+	//at the moment just does top level
+	
+	new_results = []
+	
+	if (level==='top') {
+		for (let r of results) {
+			let cat = r[0].toLowerCase()
+			if (new_mappings.hasOwnProperty(cat)) {
+				new_results.push([new_mappings[cat], r[1]])
+			}else{
+				console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
+			}
+		}
+	}else{
+		return "Not yet implemented."
+	}
+	
+	return new_results
+	
+}
+
 // Auxiliary functions, matchers, options etc
 
 const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 const {data} = require("sdk/self"); //not quite sure why this is necessary
 let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
 scriptLoader.loadSubScript(data.url("domainRules.json")); //TODO: test this, also clean up the file
-scriptLoader.loadSubScript(data.url("payload.json")); //TODO: test this
+scriptLoader.loadSubScript(data.url("payload.json")); //TODO: test this TODO is this only the final 4.4k?
+scriptLoader.loadSubScript(data.url("new_mappings.json")); //TODO: test this
 
 function getDomain(url) {
 	//returns the (sub)domain of a url

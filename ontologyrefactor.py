@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#!/usr/bin/env python
-
 #Modifies DBPedia Topic Signatures
 
 from codecs import open as copen
@@ -14,6 +12,7 @@ from subprocess import call
 import re
 
 from lda_gensim import stopwords as STOPWORDS;STOPWORDS=STOPWORDS() #maybe a better way of doing that
+from dataset_preparation import QueryFinder
 
 #REMOTE_DIR = "http://wifo5-04.informatik.uni-mannheim.de/downloads/datasets/" #3.5m raw topic signatures 
 #LOCAL_SIGNATURES_FILE = "topic_signatures_en.tsv"
@@ -220,6 +219,13 @@ class Ontology:
 			if len(value) >= 25:
 				to_save[key] = value
 		self.category_keywords = to_save
+		
+		#save category keywords to file
+		#with copen('pruned_category_keywords.txt', 'w', encoding='utf8') as f:
+		#	for k in self.category_keywords.iterkeys():
+		#		f.write(k + u"\n")
+		
+		
 		print "Classification algorithm has {0} wikipedia categories to pick from".format(len(self.category_keywords))
 		
 		d = defaultdict(list)
@@ -262,6 +268,8 @@ class Ontology:
 					for x in range(0, len(line[1:]), 2):
 						for i in range(int(line[x+2])):
 							self.iab_keywords[category].append(line[x+1])
+		
+		self.query_finder = QueryFinder()
 	
 	def classify_webpage(self, url, title): #might change this to *kwargs so users can just throw anything at it 
 		"""Attempts to classify a given webpage. Returns 10 categories"""
@@ -291,12 +299,19 @@ class Ontology:
 			self.id_to_article[index] = category
 			for k in keywords.iterkeys():
 				self.inverse_index[k].update([index])
+		
+		print "inverse index is of size: {0} and id_to_article is {1}".format(len(self.inverse_index), len(self.id_to_article))
 	
 	def classify_webpage_with_ii(self, title):
 		"""Attempts to classify a given webpage using the inverse index.
 		Returns the top 10 categories"""
 		
-		title = re.findall("[a-z]+", title.lower())
+		print "-----------------------------------"
+		print "Debugging ii webpage classification"
+		
+		title = re.findall("[a-z]{3,}", title.lower())
+		
+		print "title: {0}".format(title)
 		
 		matches = []
 		
@@ -305,8 +320,28 @@ class Ontology:
 		
 		articles = set([]) # a set of articles worth looking at, auto-deduped
 		
+		word_articles = {} #diagnostics
+		
 		for keyword in title:
 			articles.update(self.inverse_index[keyword])
+			
+			if keyword not in word_articles:
+				word_articles[keyword] = self.inverse_index[keyword]
+		
+		print "diagnostics as follows:"
+		for word in sorted(word_articles.keys()):
+			print word, len(word_articles[word])
+		print "total of {0} words".format(len(word_articles))
+		print "which have a total of {0} articles".format(sum([len(x) for x in word_articles.itervalues()]))
+		uniques = []
+		for x in word_articles.itervalues():
+			uniques += x
+		uniques = set(uniques)
+		print "{0} of which are unique".format(uniques)
+		
+		
+		
+		print "total number of articles to look at: {0}".format(len(articles))
 		
 		scores = []
 		for article_number in articles:
@@ -352,7 +387,6 @@ class Ontology:
 		
 		scores = sorted(scores, key=lambda x: x[1], reverse=True)[:10]
 		return scores
-
 
 def classify_session_queries(cls_type='freebase', kw_type='kws'):
 	"""Classifies user sessions"""
@@ -580,9 +614,9 @@ class PostProcessor:
 					matchers = [self.Stemmer.stem(cat)]
 					if "-" in matchers[0]:
 						matchers.append(matchers[0].replace("-", "_"))
-					print "Matchers: {0}".format(matchers)
 					for matcher in matchers:
 						for x in range(len(results)):
+							print "comparing {0} to {1}".format(matcher, results[x][0])
 							if matcher.lower() in results[x][0].lower():
 								print "{0} with score {1} contains {2}".format(results[x][0], results[x][1], matcher)
 								results[x][1]  = results[x][1] + 1
@@ -603,16 +637,13 @@ class PostProcessor:
 						matchers = [self.Stemmer.stem(k)]
 						if "-" in matchers[0]:
 							matchers.append(matchers[0].replace("-", "_"))
-						print "Matchers: {0}".format(matchers)
 						for matcher in matchers:
-							if matcher in results[x][0]:
+							if matcher.lower() in results[x][0].lower():
 								print "{0} with score {1} contains {2} which has score {3}".format(results[x][0], results[x][1], matcher, v)
 								results[x][1] = results[x][1] + v
 								print "score is now {0}".format(results[x][1])
 		
 		return sorted(results, key=lambda x:x[1], reverse=True)
-
-	
 
 if __name__ == '__main__':
 	print "=========================="
@@ -708,11 +739,4 @@ if __name__ == '__main__':
 			delta = end-start
 			print u"({1}.{2} seconds) Top categories: {0}".format(u', '.join(['-'.join([unicode(y) for y in x]) for x in classification]), delta.seconds, delta.microseconds)
 			print "---"
-
-
-
-
-
-
-
 

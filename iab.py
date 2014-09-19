@@ -154,7 +154,7 @@ iab = {
 	"IAB8-5a": "Beer",
 	"IAB8-6": "Coffee",
 	"IAB8-6a": "Tea",
-	"IAB8-7": "Cuisine-Specific",
+	#"IAB8-7": "Cuisine-Specific",
 	"IAB8-8": "Desserts",
 	"IAB8-8": "Baking",
 	"IAB8-9": "Dining Out",
@@ -515,6 +515,18 @@ def ngrams(text, n):
 		ngrams.append(text[i:i+n])
 	return ngrams
 
+def tokenize(text):
+	"""Tokenizes some text and makes sure the words exist"""
+	tokens = findall("[a-z]+", text.lower())
+	wordlist = [] #there must be a better way to do this in sklearn
+	with copen('/usr/share/dict/words', encoding='utf8') as f:
+		for line in f:
+			line = line[:-1]
+			wordlist.append(line.lower())
+	wordlist = set(wordlist)
+	tokens = [x for x in tokens if x in wordlist]
+	return tokens
+
 def create_top_level_distributions():
 	"""Creates bigram/keyword distributions for the top level categories"""
 	
@@ -698,24 +710,152 @@ def create_top_level_distributions_from_wiki_search():
 	
 	#save category: top x keywords
 	#save category: top x bigrams
-	for x in ["keywords", "bigrams"]:
-		with copen('iab_wiki_' + x + '.tsv', 'w', encoding='utf8') as f:
-			for key in a:
-				f.write(unicode(key) + u"\t" + u"\t".join([u"\t".join([unicode(z) for z in y]) for y in a[key][x].items()]) + u"\n")
+	
+	#commented out for demo
+	#for x in ["keywords", "bigrams"]:
+	#	with copen('iab_wiki_' + x + '.tsv', 'w', encoding='utf8') as f:
+	#		for key in a:
+	#			f.write(unicode(key) + u"\t" + u"\t".join([u"\t".join([unicode(z) for z in y]) for y in a[key][x].items()]) + u"\n")
 	
 	return tld
 
-def tokenize(text):
-	"""Tokenizes some text and makes sure the words exist"""
-	tokens = findall("[a-z]+", text.lower())
-	wordlist = [] #there must be a better way to do this in sklearn
+def create_second_level_distributions_from_wiki_search():
+	"""Creates bigram/keyword distributions for the top level categories,
+	using wikipedia search functionality.
+	
+	Test with: import iab;a=iab.create_second_level_distributions_from_wiki_search()"""
+	
+	#Create cat dictionary and storage for the end
+	cats = create_category_dictionary(iab)
+	sub_level_distribs = defaultdict(list)
+	
+	#pruning
+	#setup stopwords
+	from lda_gensim import STOPWORDS
+	
+	#import words file
+	WORDLIST = []
 	with copen('/usr/share/dict/words', encoding='utf8') as f:
 		for line in f:
 			line = line[:-1]
-			wordlist.append(line.lower())
-	wordlist = set(wordlist)
-	tokens = [x for x in tokens if x in wordlist]
-	return tokens
+			WORDLIST.append(line.lower())
+	WORDLIST = set(WORDLIST)
+	
+	for top_level, sub_cats in cats.iteritems():
+		for subcat in sub_cats:
+			#search for it on wikipedia and grab top match
+			try:
+				nearest_match = wikipedia.search(subcat)[0]
+				print u"{0} ---> {1}".format(subcat, nearest_match)
+			except IndexError:
+				print "No matches found for" + unicode(subcat)
+				continue
+			
+			#grab article
+			try:
+				article = wikipedia.page(nearest_match)
+			except wikipedia.exceptions.DisambiguationError:
+				print "Too many things to disambiguate!"
+				continue
+			
+			#get the text and extract useful content
+			text = article.content.split('\n')
+		
+			#get keywords from articles
+			conc_text = " ".join(text).lower()
+			keywords = []
+			to_add = findall("[a-z]+", conc_text)
+			for x in to_add:
+				if x not in STOPWORDS:
+					if x in WORDLIST:
+						keywords.append(x)
+			
+			#save to object
+			sub_level_distribs[subcat] += keywords
+
+	#create counters for main object
+	cats = defaultdict(dict)
+	for k,v in sub_level_distribs.iteritems():
+		cats[k] = Counter(v)
+	
+
+	with copen('iab_wiki_subcat_keywords.tsv', 'w', encoding='utf8') as f:
+		for k,v in cats.iteritems():
+			start = unicode(k) + u"\t"
+			kws = [u"\t".join([x,y]) for x,y in v.iteritems()]
+			kws = u"\t".join(kws)
+			end = u"\n"
+			f.write(start + kws + end)
+	
+def create_second_level_distributions_from_wiki_summaries():
+	"""Creates bigram/keyword distributions for the top level categories,
+	using wikipedia search functionality.
+	
+	Test with: import iab;a=iab.create_second_level_distributions_from_wiki_summaries()"""
+	
+	#Create cat dictionary and storage for the end
+	cats = create_category_dictionary(iab)
+	sub_level_distribs = defaultdict(list)
+	
+	#pruning
+	#setup stopwords
+	from lda_gensim import STOPWORDS
+	
+	#import words file
+	WORDLIST = []
+	with copen('/usr/share/dict/words', encoding='utf8') as f:
+		for line in f:
+			line = line[:-1]
+			WORDLIST.append(line.lower())
+	WORDLIST = set(WORDLIST)
+	
+	for top_level, sub_cats in cats.iteritems():
+		for subcat in sub_cats:
+			#search for it on wikipedia and grab top match
+			try:
+				nearest_match = wikipedia.search(subcat)[0]
+				print u"{0} ---> {1}".format(subcat, nearest_match)
+			except IndexError:
+				print "No matches found for" + unicode(subcat)
+				continue
+			
+			#grab article
+			try:
+				article = wikipedia.page(nearest_match)
+				article = article.summary
+			except wikipedia.exceptions.DisambiguationError:
+				print "Too many things to disambiguate!"
+				continue
+			
+			#get the text and extract useful content
+			text = article.content.split('\n')
+		
+			#get keywords from articles
+			conc_text = " ".join(text).lower()
+			keywords = []
+			to_add = findall("[a-z]+", conc_text)
+			for x in to_add:
+				if x not in STOPWORDS:
+					if x in WORDLIST:
+						keywords.append(x)
+			
+			#save to object
+			sub_level_distribs[subcat] += keywords
+
+	#create counters for main object
+	cats = defaultdict(dict)
+	for k,v in sub_level_distribs.iteritems():
+		cats[k] = Counter(v)
+	
+
+	with copen('iab_wiki_subcat_keywords.tsv', 'w', encoding='utf8') as f:
+		for k,v in cats.iteritems():
+			start = unicode(k) + u"\t"
+			kws = [u"\t".join([x,y]) for x,y in v.iteritems()]
+			kws = u"\t".join(kws)
+			end = u"\n"
+			f.write(start + kws + end)
+	
 
 
 
