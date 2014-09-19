@@ -152,8 +152,7 @@ def prune(ckm):
 		#must have lots of keywords
 		if len(keywords) < 25: continue
 		
-		if len(keywords) > 0:
-			pruned_ckm[category] = keywords
+		pruned_ckm[category] = keywords
 	
 	print "after: {0} categories (deleted {1})".format(len(pruned_ckm), len(ckm)-len(pruned_ckm))
 	return pruned_ckm
