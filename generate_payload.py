@@ -155,7 +155,7 @@ def prune(ckm):
 		if matches_meta(category): continue
 		
 		#remove any category with a number in it
-		if match("\d", category): continue
+		if match(".*\d.*", category): continue
 		
 		#remove anything that sounds like a list of people
 		if matches_nation_people(category): continue
