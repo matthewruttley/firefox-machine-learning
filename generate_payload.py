@@ -17,7 +17,7 @@ def load_category_article_matrix():
 		for n, line in enumerate(input_file):
 			if line.startswith("<"):
 				#<http://dbpedia.org/resource/Albedo> <http://purl.org/dc/terms/subject> <http://dbpedia.org/resource/Category:Climate_forcing> .\n
-				line = line.split(" ")
+				line = line.lower().split(" ")
 				article = line[0]
 				category = line[2]
 				
@@ -39,15 +39,15 @@ def load_topic_signatures():
 	with copen("topic_signatures_en.tsv", encoding='utf8') as raw:
 		for n, line in enumerate(raw):
 			
-			line = line[:-1].split('\t') #remove the newline character and separate title from rest
+			line = line[:-1].lower().split('\t') #remove the newline character and separate title from rest
 			
 			article_title = line[0]
 			
 			keywords = line[1].split('"')[-1]
 			
-			keywords = findall("[a-z]{3,}", keywords.lower())
+			keywords = findall("[a-z]{3,}", keywords)
 			
-			title_keywords = findall("[a-z]{3,}", article_title.lower())
+			title_keywords = findall("[a-z]{3,}", article_title)
 			for k in title_keywords:
 				if k not in keywords:
 					keywords.append(k)
@@ -174,52 +174,205 @@ def prune(ckm):
 	print "after: {0} categories (deleted {1})".format(len(pruned_ckm), len(ckm)-len(pruned_ckm))
 	return pruned_ckm
 
+def classify_children_as_parents(current_mapping, cam):
+	"""Inference classification method:
+	Find the parent category of all pages.
+	If the parent is classified, classify the child as the same.
+	Accepts the current mapping, and a category article matrix
+	"""
+	for category, articles in cam.iteritems():
+		category = category.lower()
+		if category in current_mapping:
+			if current_mapping[category] != "":
+				for article in articles:
+					article = article.lower()
+					if article in current_mapping:
+						if current_mapping[article] == "":
+							current_mapping[article] = current_mapping[category]
+	return current_mapping
+
+def find_useful_categories_for_geographic_auto_classification(cam, geographical_matchers, current_mapping):
+	"""Precompute useful categories to search through"""
+	
+	print "There are {0} categories in the category-article matrix".format(len(cam))
+	
+	cam_useful = set()
+	
+	for category, articles in cam.iteritems():
+		for gm in geographical_matchers:
+			if gm in category:
+				for article in articles:
+					if article in current_mapping:
+						if current_mapping[article] == "":
+							cam_useful.update([category])
+	
+	return cam_useful
+
+def geo_classify(current_mapping, geographical_areas, cam, cam_useful, geographical_matchers):
+	"""Try to geo classify places based on the existence of geographical matchers"""
+	
+	total_classified = 0
+	
+	#iterate through all geographical areas
+	for n, area in enumerate(geographical_areas):
+		eliminated = []
+		#print "Processing {0}/{1} which is {2}. Have to search {3} parents".format(n, len(geographical_areas), area, len(cam_useful))
+		for matcher in geographical_matchers:
+			matcher = matcher + "_" + area
+			for parent in cam_useful:
+				if parent.endswith(matcher):
+					for child in cam[parent]:
+						if child in current_mapping:
+							if current_mapping[child] == "":
+								current_mapping[child] = area
+								total_classified += 1
+					eliminated.append(parent)
+		for x in eliminated:
+			cam_useful.remove(x)
+	
+	print "Classified a total of {0} categories".format(total_classified)
+	
+	return current_mapping
+
+def other_classify(current_mapping, geographical_areas, cam, cam_useful, other_matchers):
+	"""Try to classify places based on the existence of various matchers"""
+	
+	total_classified = 0
+	
+	#iterate through all geographical areas
+	for n, area in enumerate(geographical_areas):
+		eliminated = []
+		#print "Processing {0}/{1} which is {2}. Have to search {3} parents".format(n, len(geographical_areas), area, len(cam_useful))
+		for matcher, classification in other_matchers.iteritems():
+			matcher = matcher + "_" + area
+			for parent in cam_useful:
+				if parent.endswith(matcher):
+					for child in cam[parent]:
+						if child in current_mapping:
+							if current_mapping[child] == "":
+								current_mapping[child] = classification
+								total_classified += 1
+					eliminated.append(parent)
+		for x in eliminated:
+			cam_useful.remove(x)
+	
+	print "Classified a total of {0} categories".format(total_classified)
+	return current_mapping
+
+def find_useful_categories(cam, other_matchers, wiki_iab):
+	"""Finds useful categories"""
+	useful = set()
+	for category, articles in cam.iteritems():
+		for matcher in other_matchers.iterkeys():
+			if matcher in category:
+				for article in articles:
+					if article in wiki_iab:
+						if wiki_iab[article] == "":
+							useful.update([category])
+							break
+	return useful
+
+def find_consensus_classifications():
+	"""Finds classified children in a parent category and suggests assignment to unclassified children"""
+	
+	suggestions = defaultdict(dict)
+	
+	for k,v in category_article_matrix.iteritems():
+		classifications = defaultdict(int)
+		blank = 0
+		for article in v:
+			if article in category_mapping:
+				mapping = category_mapping[article]
+				if mapping == "":
+					blank += 1
+				else:
+					classifications[mapping] += 1
+	
+		if blank > 0:
+			if len(classifications) == 1:
+				consensus = classifications.keys()[0]
+				if classifications[consensus] > 1:
+					suggestions[k]["blank"] = blank
+					suggestions[k]["consensus"] = consensus
+					suggestions[k]["consensus_size"] = classifications[consensus]
+	
+	return suggestions
+
+def find_blank_parents():
+	"""Finds parents who's children are entirely blank"""
+
+def find_unclassified_categories_with_lots_of_parents():
+	"""Finds things with lots of parents that are unclassified, in the hope that this will help others"""
+
 def assign_iab_categories(ckm, cam):
 	"""Tries to assign IAB categories to the wiki categories
 	This is either by doing lookups in the list of hand classified categories
 	or by existing rules
 	Outputs stats and returns a dictionary wiki:iab"""
 	
-	#get hand classified mappings (different from those in hc_del)
+	#get hand classified mappings (those classified previously as deletions were already removed during the pruning phase)
 	from new_mappings import new_mappings
 	
-	wiki_iab = {}
-	
 	#iterate through ckm and try to classify as many as possible
+	wiki_iab = {}
 	for category in ckm.iterkeys():
-		if category in new_mappings:
-			wiki_iab[category] = new_mappings[category]
-		else:
-			wiki_iab[category] = ""
+		wiki_iab[category] = new_mappings[category] if category in new_mappings else ""
 	
-	#inference method:
-	#find the parent category of all pages
-	#if the parent is classified, classify the child as the same
+	wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
 	
-	parent_count = 0
-	parent_hand_classified_count = 0
-	articles_classified = defaultdict(int)
-	articles_seen = defaultdict(int)
+	#now try and find geographical locations
+	#'congo {democratic rep}', 'congo',
+	#'sao tome & principe', 
 	
-	for category, articles in cam.iteritems():
-		category = category.lower()
-		if category in wiki_iab:
-			parent_count += 1
-			if wiki_iab[category] != "":
-				parent_hand_classified_count += 1
-				for article in articles:
-					article = article.lower()
-					if article in wiki_iab:
-						articles_seen[article] += 1
-						if wiki_iab[article] == "":
-							articles_classified[article] += 1
-							wiki_iab[article] = wiki_iab[category]
+	countries = ['the_bahamas', "the_gambia"
+					  'bosnia_and_herzegovina', 'the_central_african_republic', 'the_czech_republic',
+					  'the_dominican_republic', 'the_republic_of_ireland', 'north_korea', 'south_korea',
+					  'the_marshall_islands', 'the_maldives', 'myanmar', 'burma', 'saint_kitts_and_nevis', 'saint_lucia',
+					  'saint_vincent_and_the_grenadines', 'the_solomon_islands', 'trinidad_and_tobago', 'the_united_arab_emirates', 'the_united_kingdom',
+					  'the_united_states',
+					  'vatican_city']
+	countries += ['afghanistan',
+				 'albania', 'algeria', 'andorra', 'angola', 'antigua', 'argentina', 'armenia', 'australia', 'austria', 'azerbaijan', 'bahrain', 'bangladesh',
+				 'barbados', 'belarus', 'belgium', 'belize', 'benin', 'bhutan', 'bolivia', 'botswana', 'brazil', 'brunei', 'bulgaria', 'burkina', 'burundi', 'cambodia', 'cameroon',
+				 'canada', 'cape_verde', 'chad', 'chile', 'china', 'colombia', 'comoros', 'costa_rica', 'croatia', 'cuba', 'cyprus', 'denmark', 'djibouti', 'dominica', 'east_timor',
+				 'ecuador', 'egypt', 'el_salvador', 'equatorial_guinea', 'eritrea', 'estonia', 'ethiopia', 'fiji', 'finland', 'france', 'gabon', 'georgia', 'germany',
+				 'ghana', 'greece', 'grenada', 'guatemala', 'guinea', 'guinea-bissau', 'guyana', 'haiti', 'honduras', 'hungary', 'iceland', 'india', 'indonesia', 'iran', 'iraq', 'israel',
+				 'italy', 'jamaica', 'japan', 'jordan', 'kazakhstan', 'kenya', 'kiribati', 'kosovo', 'kuwait', 'kyrgyzstan', 'laos', 'latvia', 'lebanon', 'lesotho', 'liberia', 'libya',
+				 'liechtenstein', 'lithuania', 'luxembourg', 'macedonia', 'madagascar', 'malawi', 'malaysia', 'mali', 'malta', 'mauritania', 'mauritius', 'mexico', 'micronesia',
+				 'moldova', 'monaco', 'mongolia', 'montenegro', 'morocco', 'mozambique', 'namibia', 'nauru', 'nepal', 'netherlands', 'new_zealand', 'nicaragua', 'niger', 'nigeria',
+				 'norway', 'oman', 'pakistan', 'palau', 'panama', 'new_guinea', 'paraguay', 'peru', 'philippines', 'poland', 'portugal', 'qatar', 'romania', 'russia', 'rwanda',
+				 'samoa', 'san_marino', 'saudi_arabia', 'senegal', 'serbia', 'seychelles', 'sierra_leone', 'singapore', 'slovakia', 'slovenia', 'somalia', 'south_africa', 'spain',
+				 'sri_lanka', 'sudan', 'suriname', 'swaziland', 'sweden', 'switzerland', 'syria', 'taiwan', 'tajikistan', 'tanzania', 'thailand', 'togo', 'tonga', 'tunisia', 'turkey',
+				 'turkmenistan', 'tuvalu', 'uganda', 'ukraine', 'uruguay', 'uzbekistan', 'vanuatu', 'venezuela', 'vietnam', 'yemen', 'zambia', 'zimbabwe']
+	states = ['alabama',
+			  'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new_hampshire', 'new_jersey', 'new_mexico', 'new_york', 'north_carolina', 'north_dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode_island', 'south_carolina', 'south_dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington', 'west_virginia', 'wisconsin', 'wyoming']
+	geo_matchers = ['towns_in', 'villages_in', 'cities_in', 'districts_of', 'provinces_of']
 	
-	print "Found {0} parents".format(parent_count)
-	print "{0} of which were hand classified before".format(parent_hand_classified_count)
-	print "{0} articles were seen in total".format(len(articles_seen))
-	print "{0} articles were classified this session".format(len(articles_classified))
-	print "there are {0}/{1} left to hand or auto classify".format(len([k for k,v in wiki_iab.iteritems() if v == ""]), len(wiki_iab))
+	cam_useful = find_useful_categories_for_geographic_auto_classification(cam, geo_matchers, wiki_iab) #precompute those to actually search for in parent list (from cam)
+	
+	wiki_iab = geo_classify(wiki_iab, countries, cam, cam_useful, geo_matchers)
+	wiki_iab = geo_classify(wiki_iab, states, cam, cam_useful, geo_matchers)
+	
+	other_matchers = {
+		'football_clubs_in': 'soccer',
+		'mosques_in': 'del',
+		'chapels_in': 'del',
+		'ballet_companies_in': 'dance',
+		'government_of': 'government',
+		'languages_of': 'languages'
+	}
+	
+	ending_matchers = {
+		"_cuisine": "food & drink",
+		
+	}
+	
+	cam_useful = find_useful_categories(cam, other_matchers, wiki_iab)
+	
+	wiki_iab = other_classify(wiki_iab, countries, cam, cam_useful, other_matchers)
+	wiki_iab = other_classify(wiki_iab, states, cam, cam_useful, other_matchers)
+	
+	print "Still have to classify {0}/{1} wiki-iab".format(len([k for k,v in wiki_iab.iteritems() if v == ""]), len(wiki_iab))
 	
 	return wiki_iab
 
@@ -240,4 +393,7 @@ def create_payload():
 	
 	#now assign IAB categories to each category
 	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix)
-
+	
+	#now export those that need to be hand classified
+	find_consensus_classifications()
+	find_blank_parents()
