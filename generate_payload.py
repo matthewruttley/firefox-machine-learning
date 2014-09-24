@@ -7,6 +7,7 @@ from codecs import open as copen
 from collections import defaultdict
 from pdb import set_trace
 from re import findall, match
+from os import listdir
 
 def load_category_article_matrix():
 	"""returns a category article matrix in the form of a dictionary of sets"""
@@ -272,37 +273,197 @@ def find_useful_categories(cam, other_matchers, wiki_iab):
 							break
 	return useful
 
-def find_consensus_classifications():
+def find_consensus_classifications(cam, category_mapping):
 	"""Finds classified children in a parent category and suggests assignment to unclassified children"""
 	
 	suggestions = defaultdict(dict)
 	
-	for k,v in category_article_matrix.iteritems():
-		classifications = defaultdict(int)
-		blank = 0
+	for k,v in cam.iteritems():
+		classifications = defaultdict(list)
+		blank = []
 		for article in v:
 			if article in category_mapping:
 				mapping = category_mapping[article]
 				if mapping == "":
-					blank += 1
+					blank.append(article)
 				else:
-					classifications[mapping] += 1
+					classifications[mapping].append(article)
 	
-		if blank > 0:
+		if len(blank) > 0:
 			if len(classifications) == 1:
 				consensus = classifications.keys()[0]
-				if classifications[consensus] > 1:
+				if len(classifications[consensus]) > 1:
 					suggestions[k]["blank"] = blank
 					suggestions[k]["consensus"] = consensus
-					suggestions[k]["consensus_size"] = classifications[consensus]
+					suggestions[k]["consensus_items"] = classifications[consensus]
 	
-	return suggestions
+	suggestions = sorted(suggestions.items(), key=lambda x: len(x[1]['blank']), reverse=True)
+	
+	with copen('cx_consensus_2.txt', 'w', encoding='utf8') as f:
+		for x in suggestions:
+			f.write(u'category:\t' + x[0] + u'\n')
+			f.write(u'consensus:\t' + x[1]['consensus'] + u"\t(" + u', '.join(x[1]['consensus_items']) + u")\n")
+			f.write(u'need classification:\t' + u'\t'.join(x[1]['blank']) + u"\n")
+			f.write(u'all:\t\n\n')
+	
+	print "Outputted {0} suggestions".format(len(suggestions))
 
-def find_blank_parents():
-	"""Finds parents who's children are entirely blank"""
+def process_blank_classifications(category_mapping, show_not_found=False):
+	"""Processes blank classifications"""
+	
+	not_found = set()
+	classified = set()
+	
+	for fn in listdir('.'):
+		if ("cx" in fn) and ("blank" in fn):
+			with copen(fn, encoding='utf8') as f:
+				data = f.read()
+				data = data.split('category:')[1:]
+				for entry in data:
+					entry = entry.split('\n')
+					category = entry[0].replace('\t', '')
+					items = [x for x in entry[1].split('\t') if x != '']
+					choice = entry[2].split('\t')[1]
+					
+					if choice != '':
+						if category in category_mapping:
+							category_mapping[category] = choice
+						for x in items:
+							if x in category_mapping:
+								category_mapping[x] = choice
+								classified.update([x])
+							else:
+								not_found.update([x])
+	
+	if show_not_found:
+		print "Not found:"
+		for x in not_found:
+			print x
+	
+	print "classified a total of {0} blank items".format(classified)
+	
+	return category_mapping
 
-def find_unclassified_categories_with_lots_of_parents():
+def process_consensus_classifications(category_mapping, show_not_found=False):
+	"""Processes the consensus from the google doc https://docs.google.com/a/mozilla.com/spreadsheets/d/1FIpB3JJorqjxKRm-OplKHMkjZhKsqDqYy7ws-sNokbg/edit
+	Searches for files containing cx and consensus
+	To process it, simply Ctrl+A, Ctrl+C the entire document into a text file including explanation"""
+	
+	not_found = set()
+	classified = set()
+	
+	for fn in listdir("."):
+		if ('cx' in fn) and ('consensus' in fn):
+			with copen(fn, encoding='utf8') as f:
+				data = f.read()
+				data = data.split('category:')[2:]
+				
+				for entry in data:
+					entry = entry.split('\n')
+					category = entry[0].replace('\t', '')
+					consensus_line = entry[1].split('\t')
+					consensus = consensus_line[1]
+					consensus_items = consensus_line[2]
+					need_classification = entry[2].split('\t')[1:]
+					decision = entry[3].split('\t')[1]
+					
+					if decision == 'review':
+						for item in need_classification:
+							if item in category_mapping:
+								category_mapping[item] = ""
+					
+					if decision != "":
+						for item in need_classification:
+							if item not in category_mapping:
+								not_found.update([item])
+							else:
+								category_mapping[item] = decision
+								classified.update([item])
+				
+	if show_not_found:
+		print "Not found:"
+		for x in not_found:
+			print x
+	
+	print "Classified {0} items total".format(len(classified))
+	return category_mapping
+
+def find_blank_parents(cam, category_mapping):
+	"""Finds parents with entirely blank children"""
+	
+	added = 0
+	to_add = []
+	ignore = [
+		"births",
+		'deaths',
+		'surnames',
+		'unknown',
+		"uncertain",
+		"established_in",
+		
+	]
+	
+	with copen('cx_blank_parents_1.txt', 'w', encoding='utf8') as f:
+		for parent, children in cam.iteritems():
+			#have to prune the more extreme categories
+			
+			if len(children) > 200:
+				continue
+			if len(children) < 5:
+				continue
+			
+			ignore_parent = False
+			for x in ignore:
+				if x in parent:
+					ignore_parent = True
+					break
+			if ignore_parent:
+				continue
+			
+			empty = []
+			for child in children:
+				if child in category_mapping:
+					if category_mapping[child] != "":
+						all_empty = False
+						break
+					else:
+						empty.append(child)
+			if empty:
+				entry = []	
+				entry.append(u"category:\t" + parent + u"\n")
+				entry.append(u'\t'.join([x for x in empty]) + "\n")
+				entry.append(u'Your choice:\t\n')
+				entry.append(u'\n')
+				to_add.append(entry)
+				added += 1
+		
+		to_add = sorted(to_add, key=lambda x: x[1].count('\t'), reverse=True)
+		to_add = to_add[:1000] #temporary fix since the ouput file is a 47mb tsv lol
+		for x in to_add:
+			for line in x:
+				f.write(line)
+	
+	print "Outputted 1000 categories".format(added)
+	
+def find_unclassified_categories_with_lots_of_parents(cam, category_mapping):
 	"""Finds things with lots of parents that are unclassified, in the hope that this will help others"""
+	
+	#organize by parent count
+	parent_counts = defaultdict(list)
+	for k,v in cam.iteritems():
+		for article in v:
+			if article in category_mapping:
+				if category_mapping[article] == "":
+					parent_counts[article].append(k)
+	
+	parent_counts = sorted(parent_counts.items(), key=lambda x: len(x[1]), reverse=True)
+	
+	#now need to format them nicely
+	#article:	eric_clapton
+	#categories:
+	#not sure this is best since hugh laurie is a blue singer which would be hard to pick up on.
+	
+	return parent_counts
 
 def assign_iab_categories(ckm, cam):
 	"""Tries to assign IAB categories to the wiki categories
@@ -340,13 +501,15 @@ def assign_iab_categories(ckm, cam):
 				 'italy', 'jamaica', 'japan', 'jordan', 'kazakhstan', 'kenya', 'kiribati', 'kosovo', 'kuwait', 'kyrgyzstan', 'laos', 'latvia', 'lebanon', 'lesotho', 'liberia', 'libya',
 				 'liechtenstein', 'lithuania', 'luxembourg', 'macedonia', 'madagascar', 'malawi', 'malaysia', 'mali', 'malta', 'mauritania', 'mauritius', 'mexico', 'micronesia',
 				 'moldova', 'monaco', 'mongolia', 'montenegro', 'morocco', 'mozambique', 'namibia', 'nauru', 'nepal', 'netherlands', 'new_zealand', 'nicaragua', 'niger', 'nigeria',
-				 'norway', 'oman', 'pakistan', 'palau', 'panama', 'new_guinea', 'paraguay', 'peru', 'philippines', 'poland', 'portugal', 'qatar', 'romania', 'russia', 'rwanda',
+				 'norway', 'oman', 'pakistan', 'palau', 'panama', 'new_guinea', 'paraguay', 'peru', 'the_philippines', 'poland', 'portugal', 'qatar', 'romania', 'russia', 'rwanda',
 				 'samoa', 'san_marino', 'saudi_arabia', 'senegal', 'serbia', 'seychelles', 'sierra_leone', 'singapore', 'slovakia', 'slovenia', 'somalia', 'south_africa', 'spain',
 				 'sri_lanka', 'sudan', 'suriname', 'swaziland', 'sweden', 'switzerland', 'syria', 'taiwan', 'tajikistan', 'tanzania', 'thailand', 'togo', 'tonga', 'tunisia', 'turkey',
 				 'turkmenistan', 'tuvalu', 'uganda', 'ukraine', 'uruguay', 'uzbekistan', 'vanuatu', 'venezuela', 'vietnam', 'yemen', 'zambia', 'zimbabwe']
 	states = ['alabama',
 			  'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new_hampshire', 'new_jersey', 'new_mexico', 'new_york', 'north_carolina', 'north_dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode_island', 'south_carolina', 'south_dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'washington', 'west_virginia', 'wisconsin', 'wyoming']
-	geo_matchers = ['towns_in', 'villages_in', 'cities_in', 'districts_of', 'provinces_of']
+	geo_matchers = ['towns_in', 'villages_in', 'cities_in', 'districts_of',
+					'provinces_of', 'regional_units_of', 'regions_of', 'states_and_territories_of', 'states_of',
+					'prefectures_of', 'populated_places_in']
 	
 	cam_useful = find_useful_categories_for_geographic_auto_classification(cam, geo_matchers, wiki_iab) #precompute those to actually search for in parent list (from cam)
 	
@@ -364,7 +527,18 @@ def assign_iab_categories(ckm, cam):
 	
 	ending_matchers = {
 		"_cuisine": "food & drink",
-		
+		"_literature": "literature",
+		"_law": 'law',
+		"_musical_groups": "music",
+		"_music": "music",
+		"_philosophy": "philosophy",
+		"_singers": 'music',
+		'_peoples': 'anthropology',
+		"_fiction": 'literature',
+	}
+	
+	starting_matchers = {
+		'ethnic_groups': 'anthropology',
 	}
 	
 	cam_useful = find_useful_categories(cam, other_matchers, wiki_iab)
@@ -384,16 +558,19 @@ def create_payload():
 	category_keyword_matrix = create_category_keyword_matrix(category_article_matrix, topic_signatures)
 	
 	#clear some memory
-	#category_article_matrix = 0
 	topic_signatures = 0
 	
 	#now prune stopwords and useless categories
 	#tmp = prune(category_keyword_matrix)
 	category_keyword_matrix = prune(category_keyword_matrix) # beforehand: 657397 categories .... after: 34944 categories (deleted 622453)
 	
-	#now assign IAB categories to each category
+	#process hand classifications:
+	category_mapping = process_consensus_classifications(category_mapping, show_not_found=True)
+	category_mapping = process_blank_classifications(category_mapping, show_not_found=True)
+	
+	#now auto assign IAB categories to each category
 	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix)
 	
 	#now export those that need to be hand classified
-	find_consensus_classifications()
-	find_blank_parents()
+	find_consensus_classifications(category_article_matrix, category_mapping)
+	find_blank_parents(category_article_matrix, category_mapping)
