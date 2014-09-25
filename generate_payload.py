@@ -299,7 +299,7 @@ def find_consensus_classifications(cam, category_mapping):
 	
 	suggestions = sorted(suggestions.items(), key=lambda x: len(x[1]['blank']), reverse=True)
 	
-	with copen('cx_consensus_2.txt', 'w', encoding='utf8') as f:
+	with copen('cx_consensus_3.txt', 'w', encoding='utf8') as f:
 		for x in suggestions:
 			f.write(u'category:\t' + x[0] + u'\n')
 			f.write(u'consensus:\t' + x[1]['consensus'] + u"\t(" + u', '.join(x[1]['consensus_items']) + u")\n")
@@ -340,7 +340,7 @@ def process_blank_classifications(category_mapping, show_not_found=False):
 		for x in not_found:
 			print x
 	
-	print "classified a total of {0} blank items".format(classified)
+	print "classified a total of {0} blank items".format(len(classified))
 	
 	return category_mapping
 
@@ -403,7 +403,7 @@ def find_blank_parents(cam, category_mapping):
 		
 	]
 	
-	with copen('cx_blank_parents_1.txt', 'w', encoding='utf8') as f:
+	with copen('cx_blank_parents_2.txt', 'w', encoding='utf8') as f:
 		for parent, children in cam.iteritems():
 			#have to prune the more extreme categories
 			
@@ -449,21 +449,84 @@ def find_unclassified_categories_with_lots_of_parents(cam, category_mapping):
 	"""Finds things with lots of parents that are unclassified, in the hope that this will help others"""
 	
 	#organize by parent count
-	parent_counts = defaultdict(list)
+	parent_counts = defaultdict(set)
+	
 	for k,v in cam.iteritems():
-		for article in v:
-			if article in category_mapping:
-				if category_mapping[article] == "":
-					parent_counts[article].append(k)
+		if k in category_mapping:
+			for article in v:
+				if article in category_mapping:
+					if category_mapping[article] == "":
+						parent_counts[article].update([k])
 	
 	parent_counts = sorted(parent_counts.items(), key=lambda x: len(x[1]), reverse=True)
 	
-	#now need to format them nicely
-	#article:	eric_clapton
-	#categories:
-	#not sure this is best since hugh laurie is a blue singer which would be hard to pick up on.
+	with copen('cx_parent_counts_1.txt', 'w', encoding='utf8') as f:
+		for article, parents in parent_counts:
+			f.write(u"article:\t{0}\n".format(article))
+			f.write(u"parents:\t{0}\n".format(u'\t'.join([x for x in parents])))
+			f.write(u'Article IAB:\t\n')
+			f.write(u'\n')
+
+def find_children_with_lots_of_children(category_mapping, cam):
+	"""Finds parents that have children with lots of children - sorted descending"""
 	
-	return parent_counts
+	#metric is the largest average number of children per child
+	#need to create an object of parent -> child -> children
+	
+	#pulls out some stuff but the categories aren't homogenous, but rather very rich
+	
+	nest = defaultdict(lambda: defaultdict(set))
+	
+	for category, articles in cam.iteritems():
+		for article in articles:
+			if article in category_mapping:
+				if category_mapping[article] == "":
+					if article in cam:
+						for child_article in cam[article]:
+							if child_article in category_mapping:
+								if category_mapping[child_article] == "":
+									nest[category][article].update([child_article])
+	
+	nest = sorted(nest.items(), key=lambda x: sum([len(v) for k,v in x[1].iteritems()])/float(len(x[1])), reverse=True)
+	
+	return nest
+
+def process_starters_and_enders(category_mapping, starters, enders):
+	"""Auto classifies things based on prefixes and suffixes"""
+	
+	to_delete = set()
+	classified = 0
+	
+	for wiki, iab in category_mapping.iteritems():
+		if iab == "":
+			assigned = False
+			for w2, i2 in enders.iteritems():
+				if wiki.endswith(w2):
+					if i2 == 'del':
+						to_delete.update([wiki])
+						assigned = True
+						classified += 1
+					else:
+						category_mapping[wiki] = i2
+						assigned = True
+						classified += 1
+			
+			if not assigned:
+				for w2, i2 in starters.iteritems():
+					if wiki.startswith(w2):
+						if i2 == 'del':
+							to_delete.update([wiki])
+							classified += 1
+						else:
+							category_mapping[wiki] = i2
+							classified += 1
+	
+	for x in to_delete:
+		del category_mapping[x]
+	
+	print "Classified {0} entries based on starters and enders".format(classified)
+	
+	return category_mapping
 
 def assign_iab_categories(ckm, cam):
 	"""Tries to assign IAB categories to the wiki categories
@@ -478,8 +541,6 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = {}
 	for category in ckm.iterkeys():
 		wiki_iab[category] = new_mappings[category] if category in new_mappings else ""
-	
-	wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
 	
 	#now try and find geographical locations
 	#'congo {democratic rep}', 'congo',
@@ -525,6 +586,11 @@ def assign_iab_categories(ckm, cam):
 		'languages_of': 'languages'
 	}
 	
+	cam_useful = find_useful_categories(cam, other_matchers, wiki_iab)
+	
+	wiki_iab = other_classify(wiki_iab, countries, cam, cam_useful, other_matchers)
+	wiki_iab = other_classify(wiki_iab, states, cam, cam_useful, other_matchers)
+	
 	ending_matchers = {
 		"_cuisine": "food & drink",
 		"_literature": "literature",
@@ -535,19 +601,17 @@ def assign_iab_categories(ckm, cam):
 		"_singers": 'music',
 		'_peoples': 'anthropology',
 		"_fiction": 'literature',
+		'_architecture': 'architecture'
 	}
 	
 	starting_matchers = {
 		'ethnic_groups': 'anthropology',
 	}
 	
-	cam_useful = find_useful_categories(cam, other_matchers, wiki_iab)
-	
-	wiki_iab = other_classify(wiki_iab, countries, cam, cam_useful, other_matchers)
-	wiki_iab = other_classify(wiki_iab, states, cam, cam_useful, other_matchers)
+	wiki_iab = process_starters_and_enders(wiki_iab, starting_matchers, ending_matchers)
+	wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
 	
 	print "Still have to classify {0}/{1} wiki-iab".format(len([k for k,v in wiki_iab.iteritems() if v == ""]), len(wiki_iab))
-	
 	return wiki_iab
 
 def create_payload():
@@ -563,6 +627,8 @@ def create_payload():
 	#now prune stopwords and useless categories
 	#tmp = prune(category_keyword_matrix)
 	category_keyword_matrix = prune(category_keyword_matrix) # beforehand: 657397 categories .... after: 34944 categories (deleted 622453)
+	
+	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix)
 	
 	#process hand classifications:
 	category_mapping = process_consensus_classifications(category_mapping, show_not_found=True)
