@@ -8,7 +8,7 @@ from pdb import set_trace
 from re import findall, match
 from os import listdir
 
-geo_matchers = {
+geo = {
 	'countries': [	'the_bahamas', "the_gambia", 'bosnia_and_herzegovina', 'the_central_african_republic', 'the_czech_republic', 'the_dominican_republic', 'the_republic_of_ireland', 'north_korea', 'south_korea',
 					'the_marshall_islands', 'the_maldives', 'myanmar', 'burma', 'saint_kitts_and_nevis', 'saint_lucia', 'saint_vincent_and_the_grenadines', 'the_solomon_islands', 'trinidad_and_tobago', 'the_united_arab_emirates', 'the_united_kingdom',
 					'the_united_states', 'vatican_city', 'afghanistan',
@@ -44,40 +44,40 @@ partial_matchers = {
 		'biblical_': 'christianity',
 	},
 	'enders': {
-		'judaism': ['rabbis'],
-		'cricket': ['cricketers'],
-		'literature': ['literature', 'fiction', 'novels', 'books', 'writers'],
-		'folklore': ['folklore', 'mythology'],
-		'economists': ['economists'],
-		'geology': ['minerals'],
-		'animals': ['fish'],
-		'philosophy': ['philosophy'],
-		'anthropology': ['peoples'],
-		'automotive': ['vehicles'],
-		'news': ['newspapers'],
-		'politics': ['republicans', 'democrats', 'politicians'],
-		'law': ['law', 'lawyers'],
-		'philosophers': ['philosophers'],
-		'food & drink': ['cuisine'],
-		'soccer': ['footballers'],
-		'health & fitness': ['diseases'],
-		'fine_art': ['painters'],
-		'usa': ['massachusetts', 'connecticut'],
-		'movies': ['films'],
-		'comics': ['comics'],
-		'university': ['university'],
-		'economics': ['economics'],
-		'poetry': ['poets', 'poems'],
-		'astronomy': ['planets'],
-		'languages': ['languages'],
-		'religion': ['gods'],
-		'music': ['music', 'musical_groups', 'singers', 'composers', 'musicians', 'orchestras', 'albums', 'guitarists', 'songs'],
-		'architecture': ['architecture', 'architects'],
-		'trains': ['railroads', 'locomotives'],
-		'military': ['warfare', 'weapons', 'war'],
-		'air travel': ['aircraft'],
-		'chemistry': ['chemistry', '(element)', 'acids'],
-		'history': ['history'],
+		'judaism': set(['rabbis']),
+		'cricket': set(['cricketers']),
+		'literature': set(['literature', 'fiction', 'novels', 'books', 'writers']),
+		'folklore': set(['folklore', 'mythology']),
+		'economists': set(['economists']),
+		'geology': set(['minerals']),
+		'animals': set(['fish']),
+		'philosophy': set(['philosophy']),
+		'anthropology': set(['peoples']),
+		'automotive': set(['vehicles']),
+		'news': set(['newspapers']),
+		'politics': set(['republicans', 'democrats', 'politicians']),
+		'law': set(['law', 'lawyers']),
+		'philosophers': set(['philosophers']),
+		'food & drink': set(['cuisine']),
+		'soccer': set(['footballers']),
+		'health & fitness': set(['diseases']),
+		'fine_art': set(['painters']),
+		'usa': set(['massachusetts', 'connecticut']),
+		'movies': set(['films']),
+		'comics': set(['comics']),
+		'university': set(['university']),
+		'economics': set(['economics']),
+		'poetry': set(['poets', 'poems']),
+		'astronomy': set(['planets']),
+		'languages': set(['languages']),
+		'religion': set(['gods']),
+		'music': set(['music', 'musical_groups', 'singers', 'composers', 'musicians', 'orchestras', 'albums', 'guitarists', 'songs']),
+		'architecture': set(['architecture', 'architects']),
+		'trains': set(['railroads', 'locomotives']),
+		'military': set(['warfare', 'weapons', 'war']),
+		'air travel': set(['aircraft']),
+		'chemistry': set(['chemistry', '(element)', 'acids']),
+		'history': set(['history']),
 	},
 	'all_children': {
 		'chemical_engineering': 'chemistry',
@@ -100,7 +100,8 @@ partial_matchers = {
 		'forts': 'military',
 		'anarchism': 'politics',
 		'warfare': 'military',
-	}
+	},
+	'delparent': set([])
 }
 
 #main objects
@@ -177,6 +178,24 @@ def create_category_keyword_matrix(category_articles, topic_signatures):
 	return category_keyword_matrix
 
 #pruning
+
+def all_matchers_checker():
+	"""Creates a set of all matchers, for checking"""
+	
+	checker = set()
+	
+	for mtype, matchers in partial_matchers.iteritems():
+		if mtype not in ['delparent']:
+			for k,v in matchers:
+				if type(v) == set:
+					checker.update(v)
+				else:
+					checker.update([v])
+	
+	#also do geo
+	checker.update(geo['matchers'])
+	
+	return checker
 
 def matches_nation_people(text):
 	"""Tries to eliminate listings in the form of:
@@ -458,6 +477,41 @@ def find_most_common_prefixes(category_mapping):
 	prefixes = sorted(prefixes.items(), key=lambda x: x[1], reverse=True)
 	return prefixes
 
+def find_geo_matcher_items(category_mapping):
+	"""Finds unclassified things that contain geo matchers"""
+	
+	gm = geo['matchers']
+	items = set()
+	
+	for wiki, iab in category_mapping.iteritems():
+		if iab == "":
+			for g in gm:
+				if g in wiki:
+					items.update([wiki])
+					break
+	
+	print "Found {0} items".format(len(items))
+
+	return items
+
+def iterate_through_graph(cam, category_mapping, start):
+	"""Iterates through the graph, looking at children of children"""
+	
+	seen = set()
+	classifications = defaultdict(set)
+	queue = [start]
+	last_classification = ""
+	
+	while len(queue) > 0:
+		item = queue.pop(0)
+		seen.update([item])
+		if item in cam:
+			choice = raw_input(u'parent found: {0} - {1}'.format(item, "classify as {0}?".format(last_classification) if last_classification != '' else "what should this be? "))
+			if choice == 'y':
+				classifications[last_classification].update([item])
+
+	#TODO: complete this.	
+
 #process hand classifications
 
 def process_blank_classifications(category_mapping, show_not_found=False):
@@ -465,6 +519,8 @@ def process_blank_classifications(category_mapping, show_not_found=False):
 	
 	not_found = set()
 	classified = set()
+	checker = all_matchers_checker()
+	matchers = set()
 	
 	for fn in listdir('.'):
 		if ("cx" in fn) and ("blank" in fn) and ('pass' in fn):
@@ -476,6 +532,12 @@ def process_blank_classifications(category_mapping, show_not_found=False):
 					category = entry[0].replace('\t', '')
 					items = [x for x in entry[1].split('\t') if x != '']
 					choice = entry[2].split('\t')[1]
+					other = entry[2].split('\t')[2:]
+					
+					for x in other:
+						if x != "":
+							if x not in checker:
+								matchers.update([x])
 					
 					if choice != '':
 						if category in category_mapping:
@@ -494,17 +556,21 @@ def process_blank_classifications(category_mapping, show_not_found=False):
 		for x in not_found:
 			print x
 	
+	if len(matchers) > 0:
+		print "Matchers to add:"
+		for x in matchers:
+			print x
+	
 	print "classified a total of {0} blank items".format(len(classified))
 	
 	return category_mapping
 
 def process_consensus_classifications(category_mapping, show_not_found=False):
-	"""Processes the consensus from the google doc https://docs.google.com/a/mozilla.com/spreadsheets/d/1FIpB3JJorqjxKRm-OplKHMkjZhKsqDqYy7ws-sNokbg/edit
-	Searches for files containing cx and consensus
-	To process it, simply Ctrl+A, Ctrl+C the entire document into a text file including explanation"""
+	"""Processes the consensus classifications"""
 	
 	not_found = set()
 	classified = set()
+	checker = all_matchers_checker()
 	
 	for fn in listdir("."):
 		if ('cx' in fn) and ('consensus' in fn) and ('pass' in fn):
@@ -520,16 +586,28 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 					consensus_items = consensus_line[2]
 					need_classification = entry[2].split('\t')[1:]
 					decision = entry[3].split('\t')[1]
+					other  = [x for x in entry[3].split('\t')[2:] if x != '']
+					
+					#check if other exists in matchers
+					if len(other) > 0:
+						print "New flags:"
+						for x in other:
+							if x not in checker:
+								print x
 					
 					if decision == 'review':
 						for item in need_classification:
 							if item in category_mapping:
 								category_mapping[item] = ""
+						for item in consensus_items:
+							if item in category_mapping:
+								category_mapping[item] = ""
 						continue
 					
 					if decision == 'delparent':
-						print "Not useful: " + str(category)
-						continue
+						if category not in partial_matchers['delparent']:
+							print "Not useful: " + str(category)
+							continue
 					
 					if decision != "":
 						for item in need_classification:
@@ -550,10 +628,12 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 	return category_mapping
 
 def process_lots_of_parents_classifications(category_mapping):
-	"""Processes "lots of parents" classification files"""
+	"""Processes "lots of parents"/parent_counts classification files"""
+	
 	matchers_to_use = set()
 	added = set()
 	seen = set()
+	checker = all_matchers_checker()
 	
 	for fn in listdir('.'):
 		if ('cx' in fn) and ('parent_counts' in fn):
@@ -577,9 +657,11 @@ def process_lots_of_parents_classifications(category_mapping):
 									category_mapping[article] = choice
 									added.update([article])
 							
-							matchers = [x for x in decision[1:] if x != '']
-							if len(matchers) > 0:
-								matchers_to_use.update(matchers)
+							#matchers
+							for x in decision[1:]:
+								if x != "":
+									if x not in checker:
+										matchers_to_use.update([x])
 	
 	if len(matchers_to_use) > 0:
 		print "Matchers to add:"
@@ -590,14 +672,71 @@ def process_lots_of_parents_classifications(category_mapping):
 	
 	return category_mapping
 
-def process_starters_and_enders(cam, category_mapping, starters, enders, anything, all_child):
+def process_suffix_classifications(category_mapping):
+	"""Processes cx_suffix pass files"""
+	
+	classified = 0
+	mapping = {}
+	
+	for fn in listdir("."):
+		if 'suffix' in fn:
+			if 'pass' in fn:
+				with copen(fn, encoding='utf8') as f:
+					for line in f:
+						if len(line) > 3:
+							#(u'culture', 303)	society
+							#(u'organizations', 255)
+							line = line[:-1]
+							suffix = line.split("'")[1]
+							decision = line.split('\t')[1]
+							if decision != "":
+								mapping[suffix] = decision
+	
+	for wiki, iab in category_mapping.iteritems():
+		if iab == "":
+			components = wiki.split('_')
+			if len(components) > 1:
+				if components[-1] in mapping:
+					category_mapping[wiki] = mapping[components[-1]]
+					classified += 1
+	
+	print "Classified {0} items using suffix maps".format(classified)
+	
+	return category_mapping
+
+def process_everything(category_mapping):
+	"""Processes everything files"""
+	
+	classified = 0
+	
+	for fn in listdir("."):
+		if 'everything' in fn:
+			if 'pass' in fn:
+				with copen(fb, encoding='utf8') as f:
+					for line in f:
+						if len(line) > 3:
+							line = line[:-1].split('\t')
+							category = line[0]
+							decision = line[1]
+							if decision != "":
+								if category in category_mapping:
+									if category_mapping[category] == "":
+										category_mapping[category] = decision
+										classified += 1
+	
+	print "Classified {0} using process_everything".format(classified)
+	
+	return category_mapping
+
+#auto classify
+
+def classify_using_components(cam, category_mapping):
 	"""Auto classifies things based on prefixes and suffixes"""
 	
-	to_delete = set()
 	classified = set()
 	
 	#first iterate through all_child_matchers
-	for k,v in all_child.iteritems():
+	for k,v in partial_matchers['all_children'].iteritems():
 		if k in category_mapping:
 			category_mapping[k] = v
 			classified.update([k])
@@ -608,7 +747,6 @@ def process_starters_and_enders(cam, category_mapping, starters, enders, anythin
 						category_mapping[child] = v
 						classified.update([child])
 	
-	
 	#iterate through everything, assigning starters, enders and 'anything' matchers
 	for parent, articles in cam.iteritems():
 		parent_assigned = False
@@ -618,23 +756,24 @@ def process_starters_and_enders(cam, category_mapping, starters, enders, anythin
 				if '_' in parent:
 					parent_components = parent.split("_")
 					
-					if parent_components[-1] in enders:
-						category_mapping[parent] = enders[parent_components[-1]]
-						parent_assigned = enders[parent_components[-1]]
+					if parent_components[-1] in partial_matchers['enders']:
+						category_mapping[parent] = partial_matchers['enders'][parent_components[-1]]
+						parent_assigned = partial_matchers['enders'][parent_components[-1]]
 						classified.update([parent])
 					
 					if not parent_assigned:
-						if parent_components[0] in starters:
-							category_mapping[parent] = starters[parent_components[0]]
-							parent_assigned = starters[parent_components[0]]
+						if parent_components[0] in partial_matchers['starters']:
+							category_mapping[parent] = partial_matchers['starters'][parent_components[0]]
+							parent_assigned = partial_matchers['starters'][parent_components[0]]
 							classified.update([parent])
 					
 				if not parent_assigned:
-					for k,v in anything.iteritems():
+					for k,v in partial_matchers['anything'].iteritems():
 						if k in parent:
 							category_mapping[parent] = v
 							parent_assigned = v
 							classified.update([parent])
+							break
 		
 		for child in articles:
 			child_assigned = False
@@ -643,37 +782,33 @@ def process_starters_and_enders(cam, category_mapping, starters, enders, anythin
 					if '_' in child:
 						child_components = child.split("_")
 						
-						if child_components[-1] in enders:
-							category_mapping[child] = enders[child_components[-1]]
-							child_assigned = enders[child_components[-1]]
+						if child_components[-1] in partial_matchers['enders']:
+							category_mapping[child] = partial_matchers['enders'][child_components[-1]]
+							child_assigned = partial_matchers['enders'][child_components[-1]]
 							classified.update([child])
 						
 						if not child_assigned:
-							if child_components[0] in starters:
-								category_mapping[child] = starters[child_components[0]]
-								child_assigned = starters[child_components[0]]
+							if child_components[0] in partial_matchers['starters']:
+								category_mapping[child] = partial_matchers['starters'][child_components[0]]
+								child_assigned = partial_matchers['starters'][child_components[0]]
 								classified.update([child])
 						
 					if not child_assigned:
-						for k,v in anything.iteritems():
+						for k,v in partial_matchers['anything'].iteritems():
 							if k in child:
 								category_mapping[child] = v
 								child_assigned = v
 								classified.update([child])
+								break
 					
 					if not child_assigned:
 						if parent_assigned:
 							category_mapping[child] = parent_assigned
 							classified.update([child])
 	
-	for x in to_delete:
-		del category_mapping[x]
-	
 	print "Classified {0} entries based on starters and enders".format(len(classified))
 	
 	return category_mapping
-
-#auto classify
 
 def classify_children_as_parents(current_mapping, cam):
 	"""Inference classification method:
@@ -692,104 +827,99 @@ def classify_children_as_parents(current_mapping, cam):
 							current_mapping[article] = current_mapping[category]
 	return current_mapping
 
-def find_useful_categories_for_geographic_auto_classification(cam, geographical_matchers, current_mapping):
-	"""Precompute useful categories to search through"""
-	
-	print "There are {0} categories in the category-article matrix".format(len(cam))
-	
-	cam_useful = set()
-	
-	for category, articles in cam.iteritems():
-		for gm in geographical_matchers:
-			if gm in category:
-				for article in articles:
-					if article in current_mapping:
-						if current_mapping[article] == "":
-							cam_useful.update([category])
-	
-	return cam_useful
-
-def geo_classify(current_mapping, geographical_areas, cam, cam_useful, geographical_matchers):
+def classify_geo_locations(current_mapping, cam):
 	"""Try to geo classify places based on the existence of geographical matchers"""
 	
-	total_classified = 0
+	#first find categories that seem vaguely useful
+	cam_useful = set()
 	
-	#iterate through all geographical areas
-	for n, area in enumerate(geographical_areas):
-		eliminated = []
-		#print "Processing {0}/{1} which is {2}. Have to search {3} parents".format(n, len(geographical_areas), area, len(cam_useful))
-		for matcher in geographical_matchers:
-			matcher = matcher + "_" + area
-			for parent in cam_useful:
-				if parent.endswith(matcher):
-					for child in cam[parent]:
-						if child in current_mapping:
-							if current_mapping[child] == "":
-								current_mapping[child] = area
-								total_classified += 1
-					eliminated.append(parent)
-		for x in eliminated:
-			cam_useful.remove(x)
+	geographical_matchers = set() #get a list of matchers
+	for k,v in geo.iteritems():
+		geographical_matchers.update(v)
 	
-	print "Classified a total of {0} categories".format(total_classified)
+	for category, articles in cam.iteritems():
+		if category in current_mapping:
+			if current_mapping[category] == "":
+				for matcher in geographical_matchers:
+					if matcher in category:
+						cam_useful.update([category])
+						break
+		
+		for article in articles:
+			if article in category_mapping:
+				if category_mapping[article] == "":
+					for matcher in geographical_matchers:
+						if matcher in article:
+							cam_useful.update([article])
+							break
 	
-	return current_mapping
+	#now have found useful articles, scan to see if they are truly useful
 
-def other_classify(current_mapping, geographical_areas, cam, cam_useful, other_matchers):
-	"""Try to classify places based on the existence of various matchers"""
+	classified = set()
 	
-	total_classified = 0
+	#us states
+	for state in geo['states']:
+		for category in cam_useful:
+			if state in category:
+				for loc in geo['matchers']:
+					if loc in category:
+						classified.update([category])
+						category_mapping[category] = 'usa'
 	
-	#iterate through all geographical areas
-	for n, area in enumerate(geographical_areas):
-		eliminated = []
-		#print "Processing {0}/{1} which is {2}. Have to search {3} parents".format(n, len(geographical_areas), area, len(cam_useful))
-		for matcher, classification in other_matchers.iteritems():
-			matcher = matcher + "_" + area
-			for parent in cam_useful:
-				if parent.endswith(matcher):
-					for child in cam[parent]:
-						if child in current_mapping:
-							if current_mapping[child] == "":
-								current_mapping[child] = classification
-								total_classified += 1
-					eliminated.append(parent)
-		for x in eliminated:
-			cam_useful.remove(x)
+	cam_useful = set([x for x in cam_useful if x not in classified])
+	
+	#now try countries
+
+	for country in geo['countries']:
+		for category in cam_useful:
+			if country in category:
+				for loc in geo['matchers']:
+					if loc in category:
+						classified.update([category])
+						category_mapping[category] = country
+	
+	cam_useful = 0 #clear memory
+	
+	#now go through classified and classify children as the same
+	for category in classified:
+		if category in cam:
+			for child in cam[category]:
+				if child in category_mapping:
+					if category_mapping[child] == "":
+						category_mapping[child] = category_mapping[category]
+	
 	
 	print "Classified a total of {0} categories".format(total_classified)
 	return current_mapping
 
 def assign_iab_categories(ckm, cam):
-	"""Tries to assign IAB categories to the wiki categories
-	This is either by doing lookups in the list of hand classified categories
-	or by existing rules
-	Outputs stats and returns a dictionary wiki:iab"""
+	"""Tries to automatically assign IAB categories to the wiki categories.
+	This is either by doing lookups in the list of hand classified categories or by existing rules
+	Outputs stats and returns a dictionary wiki:iab which is generally called category_mappings in the module"""
 	
-	#get hand classified mappings (those classified previously as deletions were already removed during the pruning phase)
+	#get original hand classified mappings (those classified previously as deletions were already removed during the pruning phase)
 	from new_mappings import new_mappings
 	
-	#iterate through ckm and try to classify as many as possible
+	#iterate through ckm and try to classify as many as possible from the hand classifications
 	wiki_iab = {}
 	for category in ckm.iterkeys():
 		wiki_iab[category] = new_mappings[category] if category in new_mappings else ""
 	
 	#now try and find geographical locations
-	#'congo {democratic rep}', 'congo',
-	#'sao tome & principe', 
+	wiki_iab = classify_geo_locations(wiki_iab, cam)
 	
-	cam_useful = find_useful_categories_for_geographic_auto_classification(cam, geo_matchers, wiki_iab) #precompute those to actually search for in parent list (from cam)
+	#process components
+	wiki_iab = classify_using_components(cam, wiki_iab)
 	
-	wiki_iab = geo_classify(wiki_iab, countries, cam, cam_useful, geo_matchers)
-	wiki_iab = geo_classify(wiki_iab, states, cam, cam_useful, geo_matchers)
-
-	cam_useful = find_useful_categories(cam, other_matchers, wiki_iab)
+	#process hand classifications
+	category_mapping = process_consensus_classifications(category_mapping, show_not_found=True)
+	category_mapping = process_blank_classifications(category_mapping, show_not_found=True)
+	category_mapping = process_lots_of_parents_classifications(category_mapping)
+	category_mapping = process_suffix_classifications(category_mapping)
+	category_mapping = process_everything(category_mapping)
 	
-	wiki_iab = other_classify(wiki_iab, countries, cam, cam_useful, other_matchers)
-	wiki_iab = other_classify(wiki_iab, states, cam, cam_useful, other_matchers)
-	
-	wiki_iab = process_starters_and_enders(cam, wiki_iab, starting_matchers, ending_matchers, anything_matchers, all_child_matchers)
-	wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
+	#not sure if this is a good idea 
+	#wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
 	
 	print "Still have to classify {0}/{1} wiki-iab".format(len([k for k,v in wiki_iab.iteritems() if v == ""]), len(wiki_iab))
 	return wiki_iab
@@ -799,8 +929,8 @@ def assign_iab_categories(ckm, cam):
 def create_payload():
 	"""Handler function"""
 	
-	category_article_matrix = load_category_article_matrix() #Found 753,466 categories total
-	topic_signatures = load_topic_signatures() #Total: 3,497,639 articles
+	category_article_matrix = load_category_article_matrix() #Found 753,062 categories total
+	topic_signatures = load_topic_signatures() #Total: 3,495,585 articles
 	category_keyword_matrix = create_category_keyword_matrix(category_article_matrix, topic_signatures)
 	
 	#clear some memory
@@ -812,14 +942,6 @@ def create_payload():
 	
 	#now auto assign IAB categories to each category
 	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix)
-	
-	#process hand classifications:
-	category_mapping = process_consensus_classifications(category_mapping, show_not_found=True)
-	category_mapping = process_blank_classifications(category_mapping, show_not_found=True)
-	category_mapping = process_lots_of_parents_classifications(category_mapping)
-	
-	#Do a second pass
-	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix) #Still have to classify 22939/34959 wiki-iab
 	
 	#now export those that need to be hand classified
 	#find_children_with_lots_of_children(category_mapping, cam)
