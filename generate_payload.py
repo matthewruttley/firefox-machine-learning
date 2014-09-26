@@ -58,10 +58,10 @@ partial_matchers = {
 		'anthropology': set(['peoples']),
 		'architecture': set(['architecture', 'architects']),
 		'automotive': set(['vehicles']),
-		'astronomy': set(['_planets']),
-		'botany': set([u'_vegetables', u'bryales', u'dicranales', u'marchantiales', u'jungermanniales', u'metzgeriales']),
+		'astronomy': set(['planets']),
+		'botany': set([u'vegetables', u'bryales', u'dicranales', u'marchantiales', u'jungermanniales', u'metzgeriales']),
 		'buddhism': set(['_buddhism']),
-		'chemistry': set(['_chemistry', '_(element)', 'acids']),
+		'chemistry': set(['_chemistry', '(element)', 'acids']),
 		'comics': set(['comics']),
 		'cricket': set(['cricketers']),
 		'economics': set(['economics', 'economists']),
@@ -75,19 +75,20 @@ partial_matchers = {
 		'horse_racing': set([u'horse racing']),
 		'judaism': set(['rabbis']),
 		'law': set(['law', 'lawyers']),
-		'languages': set(['_languages']),
+		'languages': set(['languages']),
 		'literature': set(['literature', 'fiction', 'novels', 'books', 'writers']),
-		'military': set(['_warfare', 'weapons', 'war']),
+		'military': set(['warfare', 'weapons', 'war']),
 		'movies': set(['films']),
-		'music': set(['music', 'musical_groups', 'singers', '_composers', 'musicians', 'orchestras', 'albums', '_guitarists', 'songs', '_rock', '_punk', '_quintets', u'_music_genres', u'_musicians', u'records_artists']),
+		'music': set(['music', 'musical_groups', 'singers', 'composers', 'musicians', 'orchestras',
+					  'albums', 'guitarists', 'songs', 'rock', 'punk', 'quintets', u'music_genres', u'musicians', u'records_artists']),
 		'news': set(['newspapers']),
 		'philosophy': set(['philosophy', 'philosophers']),
 		'poetry': set(['poets', 'poems']),
-		'politics': set(['_republicans', '_democrats', 'politicians', u'nationalism', u'uk_mps']),
+		'politics': set(['_republicans', 'democrats', 'politicians', u'nationalism', u'uk_mps']),
 		'physics': set(['_physicists']),
 		'religion': set(['gods']),
-		'soccer': set(['footballers', '_f.c.', '_a.f.c.']),
-		'television': set(['_television_series']),
+		'soccer': set(['footballers', 'f.c.', 'a.f.c.']),
+		'television': set(['television_series']),
 		'trains': set(['railroads', 'locomotives']),
 		'university': set(['university']),
 		'usa': set(['massachusetts', 'connecticut']),
@@ -117,7 +118,7 @@ partial_matchers = {
 		'forts': 'military',
 		'anarchism': 'politics',
 		'warfare': 'military',
-		'_wars': 'military',
+		'wars': 'military',
 		u'geology': 'geology',
 		u'styles_of_music': 'music',
 		u'singer-songwriters': 'music',
@@ -351,34 +352,35 @@ def find_consensus_classifications(cam, category_mapping):
 	suggestions = defaultdict(dict)
 	
 	for parent, articles in cam.iteritems():
-		classifications = defaultdict(list)
-		blank = []
-		for article in articles:
-			if article in category_mapping:
-				mapping = category_mapping[article]
-				if mapping == "":
-					blank.append(article)
-				else:
-					classifications[mapping].append(article)
-	
-		if len(blank) > 0:
-			if len(classifications) == 1:
-				consensus = classifications.keys()[0]
-				if len(classifications[consensus]) > 1:
-					suggestions[parent]["blank"] = blank
-					suggestions[parent]["consensus"] = consensus
-					suggestions[parent]["consensus_items"] = classifications[consensus]
+		if parent not in partial_matchers['delparent']:
+			classifications = defaultdict(list)
+			blank = []
+			for article in articles:
+				if article in category_mapping:
+					mapping = category_mapping[article]
+					if mapping == "":
+						blank.append(article)
+					else:
+						classifications[mapping].append(article)
+		
+			if len(blank) > 0:
+				if len(classifications) == 1:
+					consensus = classifications.keys()[0]
+					if len(classifications[consensus]) > 1:
+						suggestions[parent]["blank"] = blank
+						suggestions[parent]["consensus"] = consensus
+						suggestions[parent]["consensus_items"] = classifications[consensus]
 	
 	suggestions = sorted(suggestions.items(), key=lambda x: len(x[1]['blank']), reverse=True)
 	
-	with copen('cx_consensus_4.txt', 'w', encoding='utf8') as f:
+	with copen('cx_consensus_6.txt', 'w', encoding='utf8') as f:
 		for x in suggestions:
 			f.write(u'category:\t' + x[0] + u'\n')
 			f.write(u'consensus:\t' + x[1]['consensus'] + u"\t(" + u', '.join(x[1]['consensus_items']) + u")\n")
 			f.write(u'need classification:\t' + u'\t'.join(x[1]['blank']) + u"\n")
 			f.write(u'all:\t\n\n')
 	
-	print "Outputted {0} suggestions - in cx_consensus_4.txt".format(len(suggestions))
+	print "Outputted {0} suggestions - in cx_consensus_6.txt".format(len(suggestions))
 
 def find_blank_parents(cam, category_mapping):
 	"""Finds parents with entirely blank children"""
@@ -395,7 +397,7 @@ def find_blank_parents(cam, category_mapping):
 		
 	]
 	
-	with copen('cx_blank_parents_3.txt', 'w', encoding='utf8') as f:
+	with copen('cx_blank_parents_5.txt', 'w', encoding='utf8') as f:
 		for parent, children in cam.iteritems():
 			#have to prune the more extreme categories
 			
@@ -435,7 +437,7 @@ def find_blank_parents(cam, category_mapping):
 			for line in x:
 				f.write(line)
 	
-	print "Outputted 1000 categories to cx_blank_parents_3".format(added)
+	print "Outputted 1000 categories to cx_blank_parents_5".format(added)
 	
 def find_unclassified_categories_with_lots_of_parents(cam, category_mapping):
 	"""Finds things with lots of parents that are unclassified, in the hope that this will help others"""
@@ -452,14 +454,14 @@ def find_unclassified_categories_with_lots_of_parents(cam, category_mapping):
 	
 	parent_counts = sorted(parent_counts.items(), key=lambda x: len(x[1]), reverse=True)
 	
-	with copen('cx_parent_counts_2.txt', 'w', encoding='utf8') as f:
+	with copen('cx_parent_counts_3.txt', 'w', encoding='utf8') as f:
 		for article, parents in parent_counts:
 			f.write(u"article:\t{0}\n".format(article))
 			f.write(u"parents:\t{0}\n".format(u'\t'.join([x for x in parents])))
 			f.write(u'Article IAB:\t\n')
 			f.write(u'\n')
 	
-	print "outputted to cx_parent_counts_2.txt"
+	print "outputted to cx_parent_counts_3.txt"
 
 def find_children_with_lots_of_children(category_mapping, cam):
 	"""Finds parents that have children with lots of children - sorted descending"""
@@ -486,12 +488,12 @@ def find_children_with_lots_of_children(category_mapping, cam):
 	return nest
 
 def find_all_unclassified(category_mapping):
-	with copen('cx_all_1.txt', 'w', encoding='utf') as f:
+	with copen('cx_all_2.txt', 'w', encoding='utf') as f:
 		for k,v in category_mapping.iteritems():
 			if v == "":
 				f.write(u"{0}\t\n".format(k))
 	
-	print "outputted to cx_all_1.txt"
+	print "outputted to cx_all_2.txt"
 
 def find_most_common_suffixes(category_mapping):
 	suffixes = defaultdict(int)
@@ -802,7 +804,14 @@ def classify_using_components(cam, category_mapping):
 	
 	classified = set()
 	
-	#first iterate through all_child_matchers
+	enders = {} #have to switch from k-v to v-k
+	for k,v in partial_matchers['enders'].iteritems():
+		for x in v:
+			enders[x] = k
+	
+	mapping = {}
+	
+	#first iterate through all_child matchers
 	for k,v in partial_matchers['all_children'].iteritems():
 		if k in category_mapping:
 			category_mapping[k] = v
@@ -823,9 +832,9 @@ def classify_using_components(cam, category_mapping):
 				if '_' in parent:
 					parent_components = parent.split("_")
 					
-					if parent_components[-1] in partial_matchers['enders']:
-						category_mapping[parent] = partial_matchers['enders'][parent_components[-1]]
-						parent_assigned = partial_matchers['enders'][parent_components[-1]]
+					if parent_components[-1] in enders:
+						category_mapping[parent] = enders[parent_components[-1]]
+						parent_assigned = enders[parent_components[-1]]
 						classified.update([parent])
 					
 					if not parent_assigned:
@@ -849,9 +858,9 @@ def classify_using_components(cam, category_mapping):
 					if '_' in child:
 						child_components = child.split("_")
 						
-						if child_components[-1] in partial_matchers['enders']:
-							category_mapping[child] = partial_matchers['enders'][child_components[-1]]
-							child_assigned = partial_matchers['enders'][child_components[-1]]
+						if child_components[-1] in enders:
+							category_mapping[child] = enders[child_components[-1]]
+							child_assigned = enders[child_components[-1]]
 							classified.update([child])
 						
 						if not child_assigned:
@@ -895,72 +904,61 @@ def classify_children_as_parents(current_mapping, cam):
 	return current_mapping
 
 def classify_geo_locations(category_mapping, cam):
-	"""Try to geo classify places based on the existence of geographical matchers"""
+	"""Revised geo classifications"""
 	
-	#first find categories that seem vaguely useful
-	cam_useful = set()
+	#things must contain at least 1 country or state
+	#and at least one geo matchers
 	
-	geographical_matchers = set() #get a list of matchers
-	for k,v in geo.iteritems():
-		geographical_matchers.update(v)
+	geo_matchers = geo['matchers']
+	countries = geo['countries']
+	states = geo['states']
 	
-	print "Found {0} geo matchers".format(len(geographical_matchers))
-	
+	useful = set()
 	for category, articles in cam.iteritems():
-		if category in category_mapping:
-			if category_mapping[category] == "":
-				for matcher in geographical_matchers:
-					if matcher in category:
-						cam_useful.update([category])
-						break
-		
+		articles.update([category])
 		for article in articles:
-			if article in category_mapping:
-				if category_mapping[article] == "":
-					for matcher in geographical_matchers:
-						if matcher in article:
-							cam_useful.update([article])
-							break
+			for matcher in geo_matchers:
+				if matcher in article:
+					useful.update([article])
+					break
 	
-	print "geo cam useful is of length: {0}".format(len(cam_useful))
+	print "Found {0} useful entries for geo classification".format(len(useful))
 	
-	#now have found useful articles, scan to see if they are truly useful
+	mapping = {}
 	
-	classified = set()
+	for item in useful:
+		for country in countries:
+			if country in item:
+				mapping[item] = country			
+				break
 	
-	#us states
-	for state in geo['states']:
-		for category in cam_useful:
-			if state in category:
-				for loc in geo['matchers']:
-					if loc in category:
-						classified.update([category])
-						category_mapping[category] = 'usa'
-						break
+	for item in useful:
+		for state in states:
+			if state in item:
+				mapping[item] = 'usa'
 	
-	cam_useful = set([x for x in cam_useful if x not in classified])
-	
-	#now try countries
-	
-	for country in geo['countries']:
-		for category in cam_useful:
-			if country in category:
-				for loc in geo['matchers']:
-					if loc in category:
-						classified.update([category])
-						category_mapping[category] = country
-	
-	cam_useful = 0 #clear memory
-	
-	#now go through classified and classify children as the same
-	for category in classified:
+	to_add = {}
+	for category, classification in mapping.iteritems():
 		if category in cam:
 			for child in cam[category]:
-				if child in category_mapping:
-					if category_mapping[child] == "":
-						category_mapping[child] = category_mapping[category]
+				to_add[child] = mapping[category]
 	
-	print "Classified a total of {0} categories based on geolocation".format(len(classified))
+	#now combine
+	for k,v in to_add.iteritems():
+		mapping[k] = v
+	
+	seen = 0
+	total = 0
+	#now add to category_mapping
+	for k,v in mapping.iteritems():
+		if k in category_mapping:
+			seen += 1
+			if category_mapping[k] == "":
+				category_mapping[k] = v
+				total += 1
+	
+	print "Geo: saw {0} items, classified {1}".format(seen, total)
+	
 	return category_mapping
 
 def assign_iab_categories(ckm, cam):
@@ -1019,9 +1017,19 @@ def create_payload():
 	generate_payload.find_consensus_classifications(category_article_matrix, category_mapping)
 	generate_payload.find_blank_parents(category_article_matrix, category_mapping)
 	generate_payload.find_unclassified_categories_with_lots_of_parents(category_article_matrix, category_mapping)
+	generate_payload.find_all_unclassified(category_mapping)
 
 
-	
+
+
+
+
+
+
+
+
+
+
 
 
 
