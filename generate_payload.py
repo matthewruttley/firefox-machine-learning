@@ -186,7 +186,7 @@ def all_matchers_checker():
 	
 	for mtype, matchers in partial_matchers.iteritems():
 		if mtype not in ['delparent']:
-			for k,v in matchers:
+			for k,v in matchers.iteritems():
 				if type(v) == set:
 					checker.update(v)
 				else:
@@ -827,7 +827,7 @@ def classify_children_as_parents(current_mapping, cam):
 							current_mapping[article] = current_mapping[category]
 	return current_mapping
 
-def classify_geo_locations(current_mapping, cam):
+def classify_geo_locations(category_mapping, cam):
 	"""Try to geo classify places based on the existence of geographical matchers"""
 	
 	#first find categories that seem vaguely useful
@@ -837,9 +837,11 @@ def classify_geo_locations(current_mapping, cam):
 	for k,v in geo.iteritems():
 		geographical_matchers.update(v)
 	
+	print "Found {0} geo matchers".format(len(geographical_matchers))
+	
 	for category, articles in cam.iteritems():
-		if category in current_mapping:
-			if current_mapping[category] == "":
+		if category in category_mapping:
+			if category_mapping[category] == "":
 				for matcher in geographical_matchers:
 					if matcher in category:
 						cam_useful.update([category])
@@ -854,7 +856,7 @@ def classify_geo_locations(current_mapping, cam):
 							break
 	
 	#now have found useful articles, scan to see if they are truly useful
-
+	
 	classified = set()
 	
 	#us states
@@ -869,7 +871,7 @@ def classify_geo_locations(current_mapping, cam):
 	cam_useful = set([x for x in cam_useful if x not in classified])
 	
 	#now try countries
-
+	
 	for country in geo['countries']:
 		for category in cam_useful:
 			if country in category:
@@ -888,9 +890,8 @@ def classify_geo_locations(current_mapping, cam):
 					if category_mapping[child] == "":
 						category_mapping[child] = category_mapping[category]
 	
-	
-	print "Classified a total of {0} categories".format(total_classified)
-	return current_mapping
+	print "Classified a total of {0} categories based on geolocation".format(len(classified))
+	return category_mapping
 
 def assign_iab_categories(ckm, cam):
 	"""Tries to automatically assign IAB categories to the wiki categories.
@@ -912,11 +913,11 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = classify_using_components(cam, wiki_iab)
 	
 	#process hand classifications
-	category_mapping = process_consensus_classifications(category_mapping, show_not_found=True)
-	category_mapping = process_blank_classifications(category_mapping, show_not_found=True)
-	category_mapping = process_lots_of_parents_classifications(category_mapping)
-	category_mapping = process_suffix_classifications(category_mapping)
-	category_mapping = process_everything(category_mapping)
+	wiki_iab = process_consensus_classifications(wiki_iab, show_not_found=True)
+	wiki_iab = process_blank_classifications(wiki_iab, show_not_found=True)
+	wiki_iab = process_lots_of_parents_classifications(wiki_iab)
+	wiki_iab = process_suffix_classifications(wiki_iab)
+	wiki_iab = process_everything(wiki_iab)
 	
 	#not sure if this is a good idea 
 	#wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
@@ -941,7 +942,7 @@ def create_payload():
 	category_keyword_matrix = prune(category_keyword_matrix) # beforehand: 657397 categories .... after: 34959 categories (deleted 623205)
 	
 	#now auto assign IAB categories to each category
-	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix)
+	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix) #this stage
 	
 	#now export those that need to be hand classified
 	#find_children_with_lots_of_children(category_mapping, cam)
