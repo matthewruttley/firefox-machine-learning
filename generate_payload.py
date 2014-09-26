@@ -30,7 +30,9 @@ geo = {
 		'new_mexico', 'new_york', 'north_carolina', 'north_dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode_island', 'south_carolina', 'south_dakota', 'tennessee', 'texas',
 		'utah', 'vermont', 'virginia', 'washington', 'west_virginia', 'wisconsin', 'wyoming'],
 	
-	'matchers': ['towns_in', 'villages_in', 'cities_in', 'districts_of', 'provinces_of', 'regional_units_of', 'regions_of', 'states_and_territories_of', 'states_of', 'prefectures_of', 'populated_places_in']
+	'matchers': [u'municipalities_of', u'islands_of', 'towns_in', 'villages_in', 'cities_in', 'districts_of', 'provinces_of', 'regional_units_of', 'regions_of',
+				 'states_and_territories_of', 'states_of', 'prefectures_of', 'populated_places_in', u'provincial_capitals', u'district_capitals', u'world_heritage_sites_in',
+				 'counties_of', 'prefectures_in']
 }
 
 partial_matchers = {
@@ -42,42 +44,53 @@ partial_matchers = {
 		'military_': 'military',
 		'musical_': 'music',
 		'biblical_': 'christianity',
+		u'universities_and_colleges': 'university',
+		'afc_': 'soccer',
+		u'singers_from': 'music',
+		u'mathematical_': 'mathematics',
+		'programming_': 'programming',
+		'wars_': 'military',
+		'plants_with': 'botany'
 	},
 	'enders': {
-		'judaism': set(['rabbis']),
-		'cricket': set(['cricketers']),
-		'literature': set(['literature', 'fiction', 'novels', 'books', 'writers']),
-		'folklore': set(['folklore', 'mythology']),
-		'economists': set(['economists']),
-		'geology': set(['minerals']),
-		'animals': set(['fish']),
-		'philosophy': set(['philosophy']),
-		'anthropology': set(['peoples']),
-		'automotive': set(['vehicles']),
-		'news': set(['newspapers']),
-		'politics': set(['republicans', 'democrats', 'politicians']),
-		'law': set(['law', 'lawyers']),
-		'philosophers': set(['philosophers']),
-		'food & drink': set(['cuisine']),
-		'soccer': set(['footballers']),
-		'health & fitness': set(['diseases']),
-		'fine_art': set(['painters']),
-		'usa': set(['massachusetts', 'connecticut']),
-		'movies': set(['films']),
-		'comics': set(['comics']),
-		'university': set(['university']),
-		'economics': set(['economics']),
-		'poetry': set(['poets', 'poems']),
-		'astronomy': set(['planets']),
-		'languages': set(['languages']),
-		'religion': set(['gods']),
-		'music': set(['music', 'musical_groups', 'singers', 'composers', 'musicians', 'orchestras', 'albums', 'guitarists', 'songs']),
-		'architecture': set(['architecture', 'architects']),
-		'trains': set(['railroads', 'locomotives']),
-		'military': set(['warfare', 'weapons', 'war']),
 		'air travel': set(['aircraft']),
-		'chemistry': set(['chemistry', '(element)', 'acids']),
+		'animals': set(['fish', u'sphodromantis', u'strepsiptera', u'thrips', u'megaloptera', 'lice', 'flies', u'tarachodes', u'rivetina', u'phasmatodea', u'miomantis', u'mirosternus', u'psocoptera', 'earwigs', u'plecoptera', u'oxyothespis', u'adephaga', u'polyphaga', 'cockroaches', 'beetles', u'eremiaphila', u'rhombodera', 'termites', u'cimicomorpha', u'acromantis', u'amantis', u'xyletobius', 'fleas', 'mayflies']),
+		'anthropology': set(['peoples']),
+		'architecture': set(['architecture', 'architects']),
+		'automotive': set(['vehicles']),
+		'astronomy': set(['_planets']),
+		'botany': set([u'_vegetables', u'bryales', u'dicranales', u'marchantiales', u'jungermanniales', u'metzgeriales']),
+		'buddhism': set(['_buddhism']),
+		'chemistry': set(['_chemistry', '_(element)', 'acids']),
+		'comics': set(['comics']),
+		'cricket': set(['cricketers']),
+		'economics': set(['economics', 'economists']),
+		'fine_art': set(['painters']),
+		'folklore': set(['folklore', 'mythology']),
+		'food & drink': set(['cuisine']),
+		'geology': set(['minerals']),
+		'health & fitness': set(['diseases']),
 		'history': set(['history']),
+		'hockey': set(['(nhl)']),
+		'horse_racing': set([u'horse racing']),
+		'judaism': set(['rabbis']),
+		'law': set(['law', 'lawyers']),
+		'languages': set(['_languages']),
+		'literature': set(['literature', 'fiction', 'novels', 'books', 'writers']),
+		'military': set(['_warfare', 'weapons', 'war']),
+		'movies': set(['films']),
+		'music': set(['music', 'musical_groups', 'singers', '_composers', 'musicians', 'orchestras', 'albums', '_guitarists', 'songs', '_rock', '_punk', '_quintets', u'_music_genres', u'_musicians', u'records_artists']),
+		'news': set(['newspapers']),
+		'philosophy': set(['philosophy', 'philosophers']),
+		'poetry': set(['poets', 'poems']),
+		'politics': set(['_republicans', '_democrats', 'politicians', u'nationalism', u'uk_mps']),
+		'physics': set(['_physicists']),
+		'religion': set(['gods']),
+		'soccer': set(['footballers', '_f.c.', '_a.f.c.']),
+		'television': set(['_television_series']),
+		'trains': set(['railroads', 'locomotives']),
+		'university': set(['university']),
+		'usa': set(['massachusetts', 'connecticut']),
 	},
 	'all_children': {
 		'chemical_engineering': 'chemistry',
@@ -89,6 +102,10 @@ partial_matchers = {
 		'chemical_processes': 'chemistry',
 		'political_theories': 'politics',
 		'television_franchises': 'television',
+		'fixed_shooters': 'computer_gaming',
+		'dos_games': 'computer_gaming',
+		'mobile_games': 'computer_gaming',
+		'msx_games': 'computer_gaming'
 	},
 	'anything': {
 		'government_of': 'government',
@@ -100,8 +117,21 @@ partial_matchers = {
 		'forts': 'military',
 		'anarchism': 'politics',
 		'warfare': 'military',
+		'_wars': 'military',
+		u'geology': 'geology',
+		u'styles_of_music': 'music',
+		u'singer-songwriters': 'music',
+		u'music_genres': 'music',
+		'bilateral_relations': 'politics'
 	},
-	'delparent': set([])
+	'delparent': set(['former_countries_in_south_asia', 'american_television_personalities', 'american_inventors', u'1998_deaths', u'people_celebrated_in_the_lutheran_liturgical_calendar', u'glaad_media_award_winners',
+					  u'american_humanitarians', u'exempt_charities', u'history_of_colonialism', u'fandom', u'english_novelists', u'transcendental_meditation_practitioners', u'pacific_coast_ranges',
+					  u'members_of_the_order_of_the_british_empire', u'victorian_novelists', u'history_of_the_united_states_(1865\u20131918)', u'american_fashion_businesspeople', u'publicly_traded_sports_companies',
+					  u'burials_at_forest_lawn_memorial_park_(glendale)', u'honorary_knights_grand_cross_of_the_order_of_the_bath', u'virgin_records_artists', u'recipients_of_the_pour_le_m\xe9rite_(civil_class)',
+					  u'metalogic', u'american_cosmetics_businesspeople', u'officers_of_the_order_of_the_british_empire', u'blog_hosting_services', u'internet_standards', u'mexican_plateau', u'haidian_district',
+					  u'buddhism_in_afghanistan', u'karelian_isthmus', u'states_and_territories_established_in_2000', u'companies_based_in_jacksonville,_florida', u'american_women_in_business',
+					  u'displaced_persons_camps_in_the_aftermath_of_world_war_ii', u'pacific_ranges', u'burials_at_ferncliff_cemetery', u'code_names', u'former_french_colonies', u'months', u'olympic_sports',
+					  u'news_corporation_subsidiaries', u'economy_of_maharashtra', u's&p_cnx_nifty'])
 }
 
 #main objects
@@ -184,16 +214,24 @@ def all_matchers_checker():
 	
 	checker = set()
 	
-	for mtype, matchers in partial_matchers.iteritems():
-		if mtype not in ['delparent']:
-			for k,v in matchers.iteritems():
-				if type(v) == set:
-					checker.update(v)
-				else:
-					checker.update([v])
+	#starters, enders, all_children, anything
+	checker.update(partial_matchers['starters'].keys())
 	
+	for x in partial_matchers['enders'].values():
+		checker.update(x)
+	
+	checker.update(partial_matchers['all_children'].keys())
+	
+	checker.update(partial_matchers['anything'].keys())
+
 	#also do geo
 	checker.update(geo['matchers'])
+	
+	#add pointless underscores
+	underscored = [u"_" + x for x in checker]
+	underscored2 = [x+u'_' for x in checker]
+	checker.update(underscored)
+	checker.update(underscored2)
 	
 	return checker
 
@@ -494,23 +532,27 @@ def find_geo_matcher_items(category_mapping):
 
 	return items
 
+def get_children(o, cam):
+	to_add = set()
+	for x in o:
+		if x in cam:
+			to_add.update(cam[x])
+	o.update(to_add)
+	return o
+
 def iterate_through_graph(cam, category_mapping, start):
 	"""Iterates through the graph, looking at children of children"""
 	
-	seen = set()
-	classifications = defaultdict(set)
-	queue = [start]
-	last_classification = ""
+	master = cam[start]
+	prev_size = 0
+	if len(master) > prev_size:
+		print prev_size
+		prev_size = len(master)
+		master = get_children(master, cam)
 	
-	while len(queue) > 0:
-		item = queue.pop(0)
-		seen.update([item])
-		if item in cam:
-			choice = raw_input(u'parent found: {0} - {1}'.format(item, "classify as {0}?".format(last_classification) if last_classification != '' else "what should this be? "))
-			if choice == 'y':
-				classifications[last_classification].update([item])
-
-	#TODO: complete this.	
+	master = [x for x in master if x in category_mapping]
+	print len(master)
+	return master
 
 #process hand classifications
 
@@ -521,6 +563,7 @@ def process_blank_classifications(category_mapping, show_not_found=False):
 	classified = set()
 	checker = all_matchers_checker()
 	matchers = set()
+	delparent = set()
 	
 	for fn in listdir('.'):
 		if ("cx" in fn) and ("blank" in fn) and ('pass' in fn):
@@ -540,26 +583,32 @@ def process_blank_classifications(category_mapping, show_not_found=False):
 								matchers.update([x])
 					
 					if choice != '':
-						if category in category_mapping:
-							if category_mapping[category] == "":
-								category_mapping[category] = choice
-						for x in items:
-							if x in category_mapping:
-								if category_mapping[x] == "":
-									category_mapping[x] = choice
-									classified.update([x])
-							else:
-								not_found.update([x])
+						if choice == 'delparent':
+							if category not in partial_matchers['delparent']:
+								delparent.update([category])
+						else:
+							if category in category_mapping:
+								if category_mapping[category] == "":
+									category_mapping[category] = choice
+							for x in items:
+								if x in category_mapping:
+									if category_mapping[x] == "":
+										category_mapping[x] = choice
+										classified.update([x])
+								else:
+									not_found.update([x])
 	
 	if show_not_found:
 		print "Not found:"
-		for x in not_found:
-			print x
+		print not_found
+	
+	if len(delparent) > 0:
+		print 'delparent:'
+		print delparent
 	
 	if len(matchers) > 0:
 		print "Matchers to add:"
-		for x in matchers:
-			print x
+		print matchers
 	
 	print "classified a total of {0} blank items".format(len(classified))
 	
@@ -570,6 +619,8 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 	
 	not_found = set()
 	classified = set()
+	delparent = set()
+	other = set()
 	checker = all_matchers_checker()
 	
 	for fn in listdir("."):
@@ -583,17 +634,16 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 					category = entry[0].replace('\t', '')
 					consensus_line = entry[1].split('\t')
 					consensus = consensus_line[1]
-					consensus_items = consensus_line[2]
+					consensus_items = consensus_line[2][1:-1].split(', ')
 					need_classification = entry[2].split('\t')[1:]
 					decision = entry[3].split('\t')[1]
-					other  = [x for x in entry[3].split('\t')[2:] if x != '']
+					new_matchers = [x for x in entry[3].split('\t')[2:] if x != '']
 					
 					#check if other exists in matchers
-					if len(other) > 0:
-						print "New flags:"
-						for x in other:
+					if len(new_matchers) > 0:
+						for x in new_matchers:
 							if x not in checker:
-								print x
+								other.update([x])
 					
 					if decision == 'review':
 						for item in need_classification:
@@ -604,12 +654,23 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 								category_mapping[item] = ""
 						continue
 					
-					if decision == 'delparent':
+					if decision == u'delparent':
 						if category not in partial_matchers['delparent']:
-							print "Not useful: " + str(category)
-							continue
+							delparent.update([category])
+						continue
 					
 					if decision != "":
+						if decision == 'delparent':
+							raw_input('something is wrong....')
+							print "entry: {0}".format(entry)
+							print "category: {0}".format(category)
+							print "consensus line: {0}".format(consensus_line)
+							print "consensus: {0}".format(consensus)
+							print "consensus items: {0}".format(consensus_items)
+							print "need classification: {0}".format(need_classification)
+							print "decision: {0}".format([decision])
+							print "new matchers: {0}".format(new_matchers)
+							raw_input()
 						for item in need_classification:
 							if item not in category_mapping:
 								not_found.update([item])
@@ -617,14 +678,21 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 								if category_mapping[item] == "":
 									category_mapping[item] = decision
 									classified.update([item])
-				
+	
 	if show_not_found:
 		print "Not found:"
-		for x in not_found:
-			print x
+		print not_found
 	
-	print "Classified {0} items total".format(len(classified))
-	print classified
+	if len(delparent) > 0:
+		print "delparent"
+		print delparent
+	
+	if len(other) > 0:
+		print "consensus new flags:"
+		print [x for x in other if x not in checker]
+		
+	
+	print "Classified {0} items total by consensus processing".format(len(classified))
 	return category_mapping
 
 def process_lots_of_parents_classifications(category_mapping):
@@ -641,7 +709,6 @@ def process_lots_of_parents_classifications(category_mapping):
 				with copen(fn, encoding='utf8') as f:
 					data = f.read()
 					data = data.split('article:')[1:]
-					print "found {0} entries".format(len(data))
 					
 					for entry in data:
 						entry = entry.split('\n')
@@ -665,8 +732,7 @@ def process_lots_of_parents_classifications(category_mapping):
 	
 	if len(matchers_to_use) > 0:
 		print "Matchers to add:"
-		for x in matchers_to_use:
-			print x
+		print matchers_to_use
 	
 	print "Saw {0} but added {1} classifications via 'lots of parents' method".format(len(seen), len(added))
 	
@@ -688,9 +754,10 @@ def process_suffix_classifications(category_mapping):
 							#(u'organizations', 255)
 							line = line[:-1]
 							suffix = line.split("'")[1]
-							decision = line.split('\t')[1]
-							if decision != "":
-								mapping[suffix] = decision
+							decision = line.split('\t')
+							if len(decision) > 1:
+								if decision[1] != "":
+									mapping[suffix] = decision[1]
 	
 	for wiki, iab in category_mapping.iteritems():
 		if iab == "":
@@ -712,7 +779,7 @@ def process_everything(category_mapping):
 	for fn in listdir("."):
 		if 'everything' in fn:
 			if 'pass' in fn:
-				with copen(fb, encoding='utf8') as f:
+				with copen(fn, encoding='utf8') as f:
 					for line in f:
 						if len(line) > 3:
 							line = line[:-1].split('\t')
@@ -855,6 +922,8 @@ def classify_geo_locations(category_mapping, cam):
 							cam_useful.update([article])
 							break
 	
+	print "geo cam useful is of length: {0}".format(len(cam_useful))
+	
 	#now have found useful articles, scan to see if they are truly useful
 	
 	classified = set()
@@ -867,6 +936,7 @@ def classify_geo_locations(category_mapping, cam):
 					if loc in category:
 						classified.update([category])
 						category_mapping[category] = 'usa'
+						break
 	
 	cam_useful = set([x for x in cam_useful if x not in classified])
 	
@@ -920,7 +990,7 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = process_everything(wiki_iab)
 	
 	#not sure if this is a good idea 
-	#wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
+	wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
 	
 	print "Still have to classify {0}/{1} wiki-iab".format(len([k for k,v in wiki_iab.iteritems() if v == ""]), len(wiki_iab))
 	return wiki_iab
@@ -930,25 +1000,25 @@ def assign_iab_categories(ckm, cam):
 def create_payload():
 	"""Handler function"""
 	
-	category_article_matrix = load_category_article_matrix() #Found 753,062 categories total
-	topic_signatures = load_topic_signatures() #Total: 3,495,585 articles
-	category_keyword_matrix = create_category_keyword_matrix(category_article_matrix, topic_signatures)
+	category_article_matrix = generate_payload.load_category_article_matrix() #Found 753,062 categories total
+	topic_signatures = generate_payload.load_topic_signatures() #Total: 3,495,585 articles
+	category_keyword_matrix = generate_payload.create_category_keyword_matrix(category_article_matrix, topic_signatures)
 	
 	#clear some memory
 	topic_signatures = 0
 	
 	#now prune stopwords and useless categories
 	#tmp = prune(category_keyword_matrix)
-	category_keyword_matrix = prune(category_keyword_matrix) # beforehand: 657397 categories .... after: 34959 categories (deleted 623205)
+	category_keyword_matrix = generate_payload.prune(category_keyword_matrix) # beforehand: 657397 categories .... after: 34959 categories (deleted 623205)
 	
 	#now auto assign IAB categories to each category
-	category_mapping = assign_iab_categories(category_keyword_matrix, category_article_matrix) #this stage
+	category_mapping = generate_payload.assign_iab_categories(category_keyword_matrix, category_article_matrix) #this stage
 	
 	#now export those that need to be hand classified
 	#find_children_with_lots_of_children(category_mapping, cam)
-	find_consensus_classifications(category_article_matrix, category_mapping)
-	find_blank_parents(category_article_matrix, category_mapping)
-	find_unclassified_categories_with_lots_of_parents(category_article_matrix, category_mapping)
+	generate_payload.find_consensus_classifications(category_article_matrix, category_mapping)
+	generate_payload.find_blank_parents(category_article_matrix, category_mapping)
+	generate_payload.find_unclassified_categories_with_lots_of_parents(category_article_matrix, category_mapping)
 
 
 	
