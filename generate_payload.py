@@ -50,9 +50,12 @@ partial_matchers = {
 		u'mathematical_': 'mathematics',
 		'programming_': 'programming',
 		'wars_': 'military',
-		'plants_with': 'botany'
+		'plants_with': 'botany',
+		'jesus': 'christianity',
+		'planetary': 'astronomy',
 	},
 	'enders': {
+		'agriculture': set(['agriculture']),
 		'air travel': set(['aircraft']),
 		'animals': set(['fish', u'sphodromantis', u'strepsiptera', u'thrips', u'megaloptera', 'lice', 'flies', u'tarachodes', u'rivetina', u'phasmatodea', u'miomantis', u'mirosternus', u'psocoptera', 'earwigs', u'plecoptera', u'oxyothespis', u'adephaga', u'polyphaga', 'cockroaches', 'beetles', u'eremiaphila', u'rhombodera', 'termites', u'cimicomorpha', u'acromantis', u'amantis', u'xyletobius', 'fleas', 'mayflies']),
 		'anthropology': set(['peoples']),
@@ -61,14 +64,14 @@ partial_matchers = {
 		'astronomy': set(['planets']),
 		'botany': set([u'vegetables', u'bryales', u'dicranales', u'marchantiales', u'jungermanniales', u'metzgeriales']),
 		'buddhism': set(['_buddhism']),
-		'chemistry': set(['_chemistry', '(element)', 'acids']),
+		'chemistry': set(['_chemistry', '(element)', 'acids', 'gases', 'gas']),
 		'comics': set(['comics']),
 		'cricket': set(['cricketers']),
 		'economics': set(['economics', 'economists']),
 		'fine_art': set(['painters']),
 		'folklore': set(['folklore', 'mythology']),
 		'food & drink': set(['cuisine']),
-		'geology': set(['minerals']),
+		'geology': set(['minerals', 'rocks']),
 		'health & fitness': set(['diseases']),
 		'history': set(['history']),
 		'hockey': set(['(nhl)']),
@@ -123,7 +126,10 @@ partial_matchers = {
 		u'styles_of_music': 'music',
 		u'singer-songwriters': 'music',
 		u'music_genres': 'music',
-		'bilateral_relations': 'politics'
+		'bilateral_relations': 'politics',
+		'premier_leagues': 'soccer',
+		'army_brigades': 'military',
+		'funk': 'music',
 	},
 	'delparent': set(['former_countries_in_south_asia', 'american_television_personalities', 'american_inventors', u'1998_deaths', u'people_celebrated_in_the_lutheran_liturgical_calendar', u'glaad_media_award_winners',
 					  u'american_humanitarians', u'exempt_charities', u'history_of_colonialism', u'fandom', u'english_novelists', u'transcendental_meditation_practitioners', u'pacific_coast_ranges',
@@ -132,7 +138,7 @@ partial_matchers = {
 					  u'metalogic', u'american_cosmetics_businesspeople', u'officers_of_the_order_of_the_british_empire', u'blog_hosting_services', u'internet_standards', u'mexican_plateau', u'haidian_district',
 					  u'buddhism_in_afghanistan', u'karelian_isthmus', u'states_and_territories_established_in_2000', u'companies_based_in_jacksonville,_florida', u'american_women_in_business',
 					  u'displaced_persons_camps_in_the_aftermath_of_world_war_ii', u'pacific_ranges', u'burials_at_ferncliff_cemetery', u'code_names', u'former_french_colonies', u'months', u'olympic_sports',
-					  u'news_corporation_subsidiaries', u'economy_of_maharashtra', u's&p_cnx_nifty'])
+					  u'news_corporation_subsidiaries', u'economy_of_maharashtra', u's&p_cnx_nifty', u'american_people_of_english_descent', u'motorboat_racing', u'ufo_religions'],
 }
 
 #main objects
@@ -629,57 +635,63 @@ def process_consensus_classifications(category_mapping, show_not_found=False):
 		if ('cx' in fn) and ('consensus' in fn) and ('pass' in fn):
 			with copen(fn, encoding='utf8') as f:
 				data = f.read()
-				data = data.split('category:')[2:]
+				data = data.split('category:')[1:]
 				
 				for entry in data:
-					entry = entry.split('\n')
-					category = entry[0].replace('\t', '')
-					consensus_line = entry[1].split('\t')
-					consensus = consensus_line[1]
-					consensus_items = consensus_line[2][1:-1].split(', ')
-					need_classification = entry[2].split('\t')[1:]
-					decision = entry[3].split('\t')[1]
-					new_matchers = [x for x in entry[3].split('\t')[2:] if x != '']
-					
-					#check if other exists in matchers
-					if len(new_matchers) > 0:
-						for x in new_matchers:
-							if x not in checker:
-								other.update([x])
-					
-					if decision == 'review':
-						for item in need_classification:
-							if item in category_mapping:
-								category_mapping[item] = ""
-						for item in consensus_items:
-							if item in category_mapping:
-								category_mapping[item] = ""
-						continue
-					
-					if decision == u'delparent':
-						if category not in partial_matchers['delparent']:
-							delparent.update([category])
-						continue
-					
-					if decision != "":
-						if decision == 'delparent':
-							raw_input('something is wrong....')
-							print "entry: {0}".format(entry)
-							print "category: {0}".format(category)
-							print "consensus line: {0}".format(consensus_line)
-							print "consensus: {0}".format(consensus)
-							print "consensus items: {0}".format(consensus_items)
-							print "need classification: {0}".format(need_classification)
-							print "decision: {0}".format([decision])
-							print "new matchers: {0}".format(new_matchers)
-							raw_input()
-						for item in need_classification:
-							if item not in category_mapping:
-								not_found.update([item])
-							else:
-								if category_mapping[item] == "":
-									category_mapping[item] = decision
-									classified.update([item])
+					if len(entry) > 5:
+						entry = entry.split('\n')
+						category = entry[0].replace('\t', '')
+						consensus_line = entry[1].split('\t')
+						consensus = consensus_line[1]
+						consensus_items = consensus_line[2][1:-1].split(', ')
+						try:
+							need_classification = entry[2].split('\t')[1:]
+						except Exception, e:
+							print e
+							raw_input(entry)
+							continue
+						decision = entry[3].split('\t')[1]
+						new_matchers = [x for x in entry[3].split('\t')[2:] if x != '']
+						
+						#check if other exists in matchers
+						if len(new_matchers) > 0:
+							for x in new_matchers:
+								if x not in checker:
+									other.update([x])
+						
+						if decision == 'review':
+							for item in need_classification:
+								if item in category_mapping:
+									category_mapping[item] = ""
+							for item in consensus_items:
+								if item in category_mapping:
+									category_mapping[item] = ""
+							continue
+						
+						if decision == u'delparent':
+							if category not in partial_matchers['delparent']:
+								delparent.update([category])
+							continue
+						
+						if decision != "":
+							if decision == 'delparent':
+								raw_input('something is wrong....')
+								print "entry: {0}".format(entry)
+								print "category: {0}".format(category)
+								print "consensus line: {0}".format(consensus_line)
+								print "consensus: {0}".format(consensus)
+								print "consensus items: {0}".format(consensus_items)
+								print "need classification: {0}".format(need_classification)
+								print "decision: {0}".format([decision])
+								print "new matchers: {0}".format(new_matchers)
+								raw_input()
+							for item in need_classification:
+								if item not in category_mapping:
+									not_found.update([item])
+								else:
+									if category_mapping[item] == "":
+										category_mapping[item] = decision
+										classified.update([item])
 	
 	if show_not_found:
 		print "Not found:"
@@ -773,6 +785,39 @@ def process_suffix_classifications(category_mapping):
 	
 	return category_mapping
 
+def process_prefix_classifications(category_mapping):
+	"""Processes cx_prefix pass files"""
+	
+	classified = 0
+	mapping = {}
+	
+	for fn in listdir("."):
+		if 'prefix' in fn:
+			if 'pass' in fn:
+				with copen(fn, encoding='utf8') as f:
+					for line in f:
+						if len(line) > 3:
+							#(u'culture', 303)	society
+							#(u'organizations', 255)
+							line = line[:-1]
+							prefix = line.split("'")[1]
+							decision = line.split('\t')
+							if len(decision) > 1:
+								if decision[1] != "":
+									mapping[prefix] = decision[1]
+	
+	for wiki, iab in category_mapping.iteritems():
+		if iab == "":
+			components = wiki.split('_')
+			if len(components) > 1:
+				if components[-1] in mapping:
+					category_mapping[wiki] = mapping[components[-1]]
+					classified += 1
+	
+	print "Classified {0} items using prefix maps".format(classified)
+	
+	return category_mapping
+
 def process_everything(category_mapping):
 	"""Processes everything files"""
 	
@@ -802,87 +847,101 @@ def process_everything(category_mapping):
 def classify_using_components(cam, category_mapping):
 	"""Auto classifies things based on prefixes and suffixes"""
 	
-	classified = set()
+	classified = 0
 	
 	enders = {} #have to switch from k-v to v-k
 	for k,v in partial_matchers['enders'].iteritems():
 		for x in v:
 			enders[x] = k
 	
-	mapping = {}
-	
 	#first iterate through all_child matchers
 	for k,v in partial_matchers['all_children'].iteritems():
 		if k in category_mapping:
 			category_mapping[k] = v
-			classified.update([k])
+			classified += 1
 		if k in cam:
 			for child in cam[k]:
 				if child in category_mapping:
 					if category_mapping[child] == "":
 						category_mapping[child] = v
-						classified.update([child])
+						classified += 1
+	
+	mapping = {}
 	
 	#iterate through everything, assigning starters, enders and 'anything' matchers
-	for parent, articles in cam.iteritems():
-		parent_assigned = False
+	print "cam is of size {0}".format(len(cam))
+	for n, (parent, articles) in enumerate(cam.iteritems()):
 		
-		if parent in category_mapping:
-			if category_mapping[parent] == '':
-				if '_' in parent:
-					parent_components = parent.split("_")
-					
-					if parent_components[-1] in enders:
-						category_mapping[parent] = enders[parent_components[-1]]
-						parent_assigned = enders[parent_components[-1]]
-						classified.update([parent])
-					
-					if not parent_assigned:
-						if parent_components[0] in partial_matchers['starters']:
-							category_mapping[parent] = partial_matchers['starters'][parent_components[0]]
-							parent_assigned = partial_matchers['starters'][parent_components[0]]
-							classified.update([parent])
-					
-				if not parent_assigned:
-					for k,v in partial_matchers['anything'].iteritems():
-						if k in parent:
-							category_mapping[parent] = v
-							parent_assigned = v
-							classified.update([parent])
-							break
+		parent_assigned = False
+		if parent not in mapping:
+			
+			for ender, mapto in enders.iteritems():
+				if parent.endswith(ender):
+					mapping[parent] = mapto
+					parent_assigned = mapto
+					classified += 1
+					break
+			
+			if not parent_assigned:
+				for starter, mapto in partial_matchers['starters'].iteritems():
+					if parent.startswith(starter):
+						mapping[parent] = mapto
+						parent_assigned = mapto
+						classified += 1
+						break
+				
+			if not parent_assigned:
+				for k,v in partial_matchers['anything'].iteritems():
+					if k in parent:
+						mapping[parent] = v
+						parent_assigned = v
+						classified += 1
+						break
+		else:
+			parent_assigned = category_mapping[parent]
 		
 		for child in articles:
-			child_assigned = False
-			if child in category_mapping:
-				if category_mapping[child] == "":
-					if '_' in child:
-						child_components = child.split("_")
-						
-						if child_components[-1] in enders:
-							category_mapping[child] = enders[child_components[-1]]
-							child_assigned = enders[child_components[-1]]
-							classified.update([child])
-						
-						if not child_assigned:
-							if child_components[0] in partial_matchers['starters']:
-								category_mapping[child] = partial_matchers['starters'][child_components[0]]
-								child_assigned = partial_matchers['starters'][child_components[0]]
-								classified.update([child])
-						
-					if not child_assigned:
-						for k,v in partial_matchers['anything'].iteritems():
-							if k in child:
-								category_mapping[child] = v
-								child_assigned = v
-								classified.update([child])
-								break
+			if child not in mapping:
+				child_assigned = False
+				
+				for ender, mapto in enders.iteritems():
+					if child.endswith(ender):
+						mapping[child] = mapto
+						child_assigned = mapto
+						classified += 1
+						break
+				
+				if not child_assigned:
+					for starter, mapto in partial_matchers['starters'].iteritems():
+						if child.startswith(starter):
+							mapping[child] = mapto
+							child_assigned = mapto
+							classified += 1
+							break
 					
-					if not child_assigned:
-						if parent_assigned:
-							category_mapping[child] = parent_assigned
-							classified.update([child])
+				if not child_assigned:
+					for k,v in partial_matchers['anything'].iteritems():
+						if k in child:
+							mapping[child] = v
+							child_assigned = v
+							classified += 1
+							break
+				
+				if not child_assigned:
+					if parent_assigned:
+						category_mapping[child] = parent_assigned
+						classified += 1
+		
+		if n % 100000 == 0:
+			print "Processed {0} components, mapping size is {1}".format(n, len(mapping))
+
+	#now transfer mappings to real mappings
+	for k,v in mapping.iteritems():
+		if k in category_mapping:
+			if category_mapping[k] == "":
+				category_mapping[k] = v
 	
-	print "Classified {0} entries based on starters and enders".format(len(classified))
+	print "Classified {0} entries based on starters and enders".format(classified)
 	
 	return category_mapping
 
@@ -914,13 +973,16 @@ def classify_geo_locations(category_mapping, cam):
 	states = geo['states']
 	
 	useful = set()
-	for category, articles in cam.iteritems():
+	print "cam size is {0}".format(len(cam))
+	for n, (category, articles) in enumerate(cam.iteritems()):
 		articles.update([category])
 		for article in articles:
 			for matcher in geo_matchers:
 				if matcher in article:
 					useful.update([article])
 					break
+		if n % 100000 == 0:
+			print "Processed {0} cam items for geo".format(n)
 	
 	print "Found {0} useful entries for geo classification".format(len(useful))
 	
@@ -985,6 +1047,7 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = process_blank_classifications(wiki_iab, show_not_found=True)
 	wiki_iab = process_lots_of_parents_classifications(wiki_iab)
 	wiki_iab = process_suffix_classifications(wiki_iab)
+	wiki_iab = process_prefix_classifications(wiki_iab)
 	wiki_iab = process_everything(wiki_iab)
 	
 	#not sure if this is a good idea 
