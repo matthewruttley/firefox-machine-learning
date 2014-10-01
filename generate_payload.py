@@ -7,6 +7,7 @@ from collections import defaultdict
 from pdb import set_trace
 from re import findall, match
 from os import listdir
+from json import load
 
 geo = {
 	'countries': [	'the_bahamas', "the_gambia", 'bosnia_and_herzegovina', 'the_central_african_republic', 'the_czech_republic', 'the_dominican_republic', 'the_republic_of_ireland', 'north_korea', 'south_korea',
@@ -59,7 +60,7 @@ partial_matchers = {
 		'air travel': set(['aircraft']),
 		'animals': set(['fish', u'sphodromantis', u'strepsiptera', u'thrips', u'megaloptera', 'lice', 'flies', u'tarachodes', u'rivetina', u'phasmatodea', u'miomantis', u'mirosternus', u'psocoptera', 'earwigs', u'plecoptera', u'oxyothespis', u'adephaga', u'polyphaga', 'cockroaches', 'beetles', u'eremiaphila', u'rhombodera', 'termites', u'cimicomorpha', u'acromantis', u'amantis', u'xyletobius', 'fleas', 'mayflies']),
 		'anthropology': set(['peoples']),
-		'architecture': set(['architecture', 'architects']),
+		'architecture': set(['architects']),
 		'automotive': set(['vehicles']),
 		'astronomy': set(['planets']),
 		'botany': set([u'vegetables', u'bryales', u'dicranales', u'marchantiales', u'jungermanniales', u'metzgeriales']),
@@ -109,7 +110,12 @@ partial_matchers = {
 		'fixed_shooters': 'computer_gaming',
 		'dos_games': 'computer_gaming',
 		'mobile_games': 'computer_gaming',
-		'msx_games': 'computer_gaming'
+		'msx_games': 'computer_gaming',
+		'architecture': 'architecture',
+		'statistics': 'mathematics',
+		'linear_algebra': 'mathematics',
+		'discreet_groups': 'mathematics',
+		'harmonic_analysis': 'mathematics',
 	},
 	'anything': {
 		'government_of': 'government',
@@ -130,6 +136,8 @@ partial_matchers = {
 		'premier_leagues': 'soccer',
 		'army_brigades': 'military',
 		'funk': 'music',
+		'algebra': 'mathematics',
+		'mathematical': 'mathematics',
 	},
 	'delparent': set(['former_countries_in_south_asia', 'american_television_personalities', 'american_inventors', u'1998_deaths', u'people_celebrated_in_the_lutheran_liturgical_calendar', u'glaad_media_award_winners',
 					  u'american_humanitarians', u'exempt_charities', u'history_of_colonialism', u'fandom', u'english_novelists', u'transcendental_meditation_practitioners', u'pacific_coast_ranges',
@@ -138,7 +146,8 @@ partial_matchers = {
 					  u'metalogic', u'american_cosmetics_businesspeople', u'officers_of_the_order_of_the_british_empire', u'blog_hosting_services', u'internet_standards', u'mexican_plateau', u'haidian_district',
 					  u'buddhism_in_afghanistan', u'karelian_isthmus', u'states_and_territories_established_in_2000', u'companies_based_in_jacksonville,_florida', u'american_women_in_business',
 					  u'displaced_persons_camps_in_the_aftermath_of_world_war_ii', u'pacific_ranges', u'burials_at_ferncliff_cemetery', u'code_names', u'former_french_colonies', u'months', u'olympic_sports',
-					  u'news_corporation_subsidiaries', u'economy_of_maharashtra', u's&p_cnx_nifty', u'american_people_of_english_descent', u'motorboat_racing', u'ufo_religions'],
+					  u'news_corporation_subsidiaries', u'economy_of_maharashtra', u's&p_cnx_nifty', u'american_people_of_english_descent', u'motorboat_racing', u'ufo_religions']
+	),
 }
 
 #main objects
@@ -297,6 +306,17 @@ def hand_deleted_categories():
 					hc_del.update([wiki])
 	return hc_del
 
+def remove_due_to_ender(category):
+	"""List of unhelpful enders"""
+	
+	enders = set(['businesspeople', 'executives'])
+	
+	for x in enders:
+		if category.endswith(ender):
+			return True
+		
+	return False
+
 def prune(ckm):
 	"""Prunes bad articles and bad keywords from the category keyword matrix"""
 		
@@ -309,6 +329,9 @@ def prune(ckm):
 		
 		#make sure it wasn't deleted
 		if category in deleted: continue
+		
+		#if it ends in something we want to specifically remove
+		if remove_due_to_ender(category): continue
 		
 		#can only have short titles
 		underscores = category.count("_")
@@ -898,7 +921,8 @@ def classify_using_components(cam, category_mapping):
 						classified += 1
 						break
 		else:
-			parent_assigned = category_mapping[parent]
+			if parent in category_mapping:
+				parent_assigned = category_mapping[parent]
 		
 		for child in articles:
 			if child not in mapping:
@@ -929,7 +953,7 @@ def classify_using_components(cam, category_mapping):
 				
 				if not child_assigned:
 					if parent_assigned:
-						category_mapping[child] = parent_assigned
+						mapping[child] = parent_assigned
 						classified += 1
 		
 		if n % 100000 == 0:
@@ -1050,13 +1074,327 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = process_prefix_classifications(wiki_iab)
 	wiki_iab = process_everything(wiki_iab)
 	
-	#not sure if this is a good idea 
-	wiki_iab = classify_children_as_parents(wiki_iab, cam) #infer child classifications
+	#infer child classifications
+	wiki_iab = classify_children_as_parents(wiki_iab, cam); print "omg 10" if '' in wiki_iab else 'nope not there'
 	
 	print "Still have to classify {0}/{1} wiki-iab".format(len([k for k,v in wiki_iab.iteritems() if v == ""]), len(wiki_iab))
 	return wiki_iab
 
 #handle all the functions
+
+def resolve_mistakes(category_mapping, cam):
+	"""Resolves mistakes or abbreviations in the hand classification
+	
+	TODO:
+	- Look into unclassified category for coverage metric
+	- make sure things like university actually exist
+	
+	how do these exist
+	mistakes = {
+		u'delparent': '',
+		u'del': '',
+		u'del_parent': '',
+	}
+	
+	#weather category - local news???
+	
+	"""
+	
+	#change hotel to hotels for all
+	
+	#first load mozcat
+	with open('mozcat_heirarchy.json') as f:
+		tree = load(f)
+	
+	#make flat list
+	all_cats = set()
+	for k,v in tree.iteritems():
+		all_cats.update([k])
+		all_cats.update(v)
+	
+	cleaned = {}
+	#clean up mappings
+	for k,v in category_mapping.iteritems():
+		v = v.strip() #remove whitespace
+		v = v.lower() #lower case
+		v = v.replace("_", " ") #replace underscores
+		cleaned[k] = v #insert
+	category_mapping = cleaned
+	cleaned = 0 #free up memory
+	
+	nest = {
+		u'golf': 'nest_sports','hockey': 'nest_sports',u'tennis': 'nest_sports','cricket': 'nest_sports',
+		u'rugby': 'nest_sports',u'volleyball': 'nest_sports',
+		
+		u'piano': 'nest_music',
+		'university': 'nest_education',
+		'writing': 'nest_hobbies & interests',
+		u'cardiac arrest': 'nest_health & fitness',
+		u'windows ': 'nest_technology & computing',
+		'theatre': 'nest_arts & entertainment',
+		u'journalism': 'nest_news',
+		
+		'kosovo': 'nest_travel','north_korea': 'nest_travel','senegal': 'nest_travel','gabon': 'nest_travel','guinea': 'nest_travel','barbados': 'nest_travel','bhutan': 'nest_travel','micronesia': 'nest_travel','kuwait': 'nest_travel','belarus': 'nest_travel','liberia': 'nest_travel','latvia': 'nest_travel',
+		'kyrgyzstan': 'nest_travel', 'haiti': 'nest_travel','zambia': 'nest_travel','lebanon': 'nest_travel','luxembourg': 'nest_travel',u'greenland': 'nest_travel','honduras': 'nest_travel','palau': 'nest_travel','mozambique': 'nest_travel',
+		'armenia': 'nest_travel','kiribati': 'nest_travel','belize': 'nest_travel','tunisia': 'nest_travel','oman': 'nest_travel',u'colombia': 'nest_travel',
+		'niger': 'nest_travel','fiji': 'nest_travel','comoros': 'nest_travel','slovenia': 'nest_travel','dominica': 'nest_travel','turkmenistan': 'nest_travel',
+		'slovakia': 'nest_travel','suriname': 'nest_travel',u'bolivia': 'nest_travel','malawi': 'nest_travel','ecuador': 'nest_travel',
+		'algeria': 'nest_travel','montenegro': 'nest_travel','togo': 'nest_travel','cambodia': 'nest_travel','ethiopia': 'nest_travel','argentina': 'nest_travel',
+		u'yemen': 'nest_travel','portugal': 'nest_travel','lesotho': 'nest_travel','uganda': 'nest_travel','burundi': 'nest_travel',
+		u'turkey': 'nest_travel','madagascar': 'nest_travel','antigua': 'nest_travel','mali': 'nest_travel', 'vanuatu': 'vanuatu',
+		'trains': 'nest_travel','sri_lanka': 'nest_travel',u'columbia': 'nest_travel','chad': 'nest_travel','mauritius': 'nest_travel',
+		'botswana': 'nest_travel',
+		'theme parks': 'nest_travel'}
+
+	for k,v in nest.iteritems():
+		under_what = v[5:]
+		if under_what not in all_cats:
+			print "Mistake: {0} doesn't exist in all_cats".format(v)
+		else:
+			category_mapping[k] = k #create
+			tree[under_what].append(k) #nest
+			all_cats.update([k])
+	
+	change_then_nest_under_travel = {
+		'the_maldives': 'maldives',
+		'the_czech_republic': 'czech republic',
+		'the_dominican_republic': 'dominican republic',
+		'sierra_leone': 'sierra leone',
+		'saint_kitts_and_nevis': 'saint kitts and nevis',
+		'the_bahamas': 'the bahamas',
+		'the_united_arab_emirates': 'united arab emirates',
+		'saint_lucia': 'saint lucia',
+		'burkina': 'burkina faso',
+		'the_united_kingdom': 'united kingdom',
+		'cape_verde': 'cape verde',
+		'east_timor': 'east timor',
+		u'Bosnia and Herzegovina': 'bosnia and herzegovina',
+		'trinidad_and_tobago': 'trinidad and tobago',
+		'the_marshall_islands': 'the marshall islands',
+		'el_salvador': 'el salvador',
+		'the_gambia': 'the gambia',
+		'the_central_african_republic': 'central african republic',
+	}
+	
+	for k,v in change_then_nest_under_travel.iteritems():
+		to_change = [x for x in category_mapping if category_mapping[x] == k]
+		#correct them
+		for x in to_change:
+			category_mapping[x] = v
+		
+		#if v doesn't exist, create it
+		if v not in all_cats:
+			tree['travel'].append(v) #and nest it under travel
+	
+	redirects = {
+		#redirects (typically mistakes or abbreviations)
+		'luxury car': 'automotive_luxury cars',
+		u'children': 'education_parenting children',
+		u'linguistics': 'education_languages',
+		u'wales': 'travel_united kingdom',
+		u'universitiy': 'education_university',
+		'trucks': 'automotive_pickup trucks',
+		'toddlers': 'education_parenting children',
+		u'radio ': 'arts & entertainment_radio',
+		u'psychology': 'health & fitness_psychology & psychiatry',
+		'south_korea': 'travel_korea',
+		'burma': 'travel_myanmar',
+		u'chemical_mixtures': 'science_chemistry',
+		u'video': 'technology & computing_desktop video',
+		u'boats': 'sports_sailing',
+		'the_united_states': 'travel_usa',
+		u'greenland': 'travel_greenland',
+		u'greeland': 'travel_greenland',
+		'the_republic_of_ireland': 'travel_ireland',
+		u'phyics': 'science_physics',
+		u'operas': 'arts & entertainment_opera',
+		u'train': 'travel_trains',
+		u'food & drinks': 'food & drink',
+		'programming': 'technology & computing_computer programming',
+		u'sports ': 'sports',
+	}
+	
+	for k,v in redirects.iteritems():
+		#split up v
+		v = v.split('_')
+		if len(v) == 1:
+			#v is top level
+			#might need to make it
+			if v[0] not in all_cats:
+				all_cats.update([v[0]])
+				tree[v[0]] = []
+			
+			for x in category_mapping.iterkeys():
+				if category_mapping[x] == k:
+					category_mapping[x] = v[0]
+		else:
+			#v is in two parts
+			top_level = v[0]
+			sub_cat = v[1]
+			
+			#make sure top level exists
+			if top_level not in all_cats:
+				all_cats.update([top_level])
+				tree[top_level] = []
+			
+			#make sure sub cat exists
+			if sub_cat not in all_cats:
+				all_cats.update([sub_cat])
+				tree[top_level].append(sub_cat)
+			
+			#nest it
+			for x in category_mapping.iterkeys():
+				if category_mapping[x] == k:
+					category_mapping[x] = v[1]
+	
+	corrections = {
+		'shipping_companies': 'business',
+		'pharmaceutical_companies': 'business', 'dental_companies': 'dental care', 'ontario_hydro': 'energy', 'performance_management': 'business', 'translation_companies': 'languages', 'imperial_tobacco': 'smoking',
+		'trade': 'business', 'genomics_companies': 'biotech', 'guano_trade': 'business', 'internet_companies': 'internet', 'nb_power': 'energy', 'ice_trade': 'energy', 'petrochemical_companies': 'energy',
+		'clothing_companies': 'clothing', 'amiga_companies': 'computer gaming', 'robotics_companies': 'physics', 'free_market': 'business', 'biotechnology_companies': 'biotech', 'skateboarding_companies': 'skateboarding',
+		'berkshire_hathaway': 'investing', 'reinsurance_companies': 'insurance', 'fair_trade': 'business', 'signage_companies': 'business', 'florist_companies': 'business', 'tamiya_corporation': 'childrens',
+		'software_companies': 'business', 'tea_companies': 'tea', 'permira_companies': 'business', 'gazprom': 'energy', 'aerospace': 'military', 'foodservice_companies': 'logistics', 'televisa': 'television',
+		'wine_companies': 'wine', 'glassmaking_companies': 'business', 'computer_companies': 'computer hardware', 'xcel_energy': 'energy', 'tobacco_companies': 'smoking', 'cosmetics_companies': 'beauty',
+		'aerospace_companies': 'military', 'mitsubishi_companies': 'business', 'apple_inc.': 'apple mac', 'accounting_scandals': 'business', 'oil_companies': 'energy', 'newspaper_companies': 'news',
+		'printing_companies': 'publishing', 'slavery': 'history', 'theatre_companies': 'theatre', 'glaxosmithkline': 'biomedical', 'duke_energy': 'energy', 'fragrance_companies': 'beauty', 'bridgestone': 'racing',
+		'unilever_companies': 'business', 'outsourcing': 'business', 'tata_group': 'metals', 'process_management': 'business', 'statoil': 'energy', 'technology_companies': 'technology & computing',
+		'viz_media': 'comics', 'mitterrand-pasqua_affair': 'politics', 'exxonmobil': 'energy', 'seed_companies': 'gardening', 'energy_companies': 'energy', 'business': 'business',
+		'holding_companies': 'business', 'online_companies': 'del', 'franchises': 'business', 'self-organization': 'del', 'burmah-castrol': 'energy', 'nanotechnology_companies': 'business',
+		'weapons_trade': 'military', 'branding_companies': 'marketing', 'mitsui': 'business', 'windows_live': 'windows', 'dvd_companies': 'dvd', 'total_s.a.': 'energy', 'industry': 'business',
+		'telecommunications_companies': 'business', 'ballet_companies': 'dance', 'voip_companies': 'computer networking', 'trading_companies': 'business', 'packaging_companies': 'business',
+		'map_companies': 'geography', 'amazon.com': 'ecommerce', 'icici_bank': 'personal finance', 'hentai_companies': 'pornography', 'opec': 'energy', 'security_companies': 'military',
+		'cryptography_companies': 'computer security', 'compuserve': 'technology & computing', 'sugar_companies': 'food & drink', 'management': 'business', 'museum_companies': 'history',
+		'human_trafficking': 'crime', 'dual-listed_companies': 'business', 'texaco': 'energy', 'aluminium_companies': 'metals', 'computer_security': 'computer security', 'film_companies': 'movies',
+		'msn': 'internet', 'georgia_power': 'energy', 'enron': 'crime', 'accountancy': 'business', 'mining': 'business', 'taxicab_companies': 'travel', 'meteorological_companies': 'geography',
+		'poker_companies': 'gambling', 'employee-owned_companies': 'business', 'nikon': 'photography', 'pasta_companies': 'italian cuisine', 'norsk_hydro': 'energy', 'petrobras': 'energy',
+		'commerce': 'commerce', 'cartels': 'business', 'ibm': 'technology & computing', 'texas_instruments': 'science', 'red_hat': 'unix', 'engineering_companies': 'business', 'collegehumor': 'humor',
+		'saskpower': 'energy', 'slave_trade': 'history', 'hospitality_companies': 'hotel', 'agent-owned_companies': 'del', 'food_companies': 'business', 'photography_companies': 'photography',
+		'business_analysis': 'business', 'lukoil': 'energy', 'podcasting_companies': 'radio', 'motherboard_companies': 'computer hardware', 'non-profit_corporations': 'business',
+		'agriculture_companies': 'agriculture', 'investment_companies': 'investing', 'snowboarding_companies': 'snowboarding', 'chemical_companies': 'business', 'railway_companies': 'trains',
+		'chartered_companies': 'business', 'e.on': 'energy', 'corporations': 'del', 'fertilizer_companies': 'agriculture', 'moving_companies': 'interior design', 'lenovo': 'computer hardware',
+		'networking_companies': 'computer networking', 'bhp_billiton': 'energy', 'access_control': 'del', 'bandai_visual': 'comics', 'database_companies': 'databases', 'standard_oil': 'energy',
+		'samsung_electronics': 'business', 'cement_companies': 'construction', 'sports_business': 'business', 'brave_series': 'comics', 'self-publishing_companies': 'publishing',
+		'television_companies': 'television', 'chevron_corporation': 'automotive', 'dance_companies': 'dance', 'linux_companies': 'unix', 'seiko_epson': 'business', 'capitalism': 'business',
+		'e-commerce': 'ecommerce', 'small_business': 'business', 'wargame_companies': 'board games', 'training_companies': 'human resources', 'microsoft': 'windows', 'coolie_trade': 'history',
+		'opera_companies':'opera',
+		u'energy': 'energy',
+		'logistics_companies':'logisitcs',
+		'mahindra_group':'business',
+		'watco_companies':'business',
+		'outsourcing_companies':'business',
+		'bristol-myers_squibb':'biomedical',
+		'textile_companies':'fashion',
+		'loblaw_companies':'food & drink',
+		'swire_group':'business',
+		'gis_companies':'business',
+		'bridge_companies':'construction',
+		'flavor_companies':'food & drink',
+		'bel-mid_companies':'business',
+		'defence_companies':'military',
+		'infosys':'business',
+		'commodore_international':'computer hardware',
+		'levant_company':'history',
+		'jingle_companies':'marketing',
+		'sunoco':'energy',
+		'eads':'air travel',
+		'insurance_companies':'insurance',
+		'pink_pineapple':'pornography',
+		'conglomerate_companies':'business',
+		'media_blasters':'comics',
+		'hat_companies':'clothing',
+		'leasing_companies':'logistics',
+		'livery_companies':'del',
+		'jewellery_companies':'jewelry',
+		'eni':'energy',
+		'international_business':'business',
+		'entergy':'energy',
+		'bofors_scandal':'crime',
+		'parking_companies':'logistics',
+		're-established_companies':'del',
+		'petronas':'energy',
+		'alfa_group':'business',
+		'service_companies':'del',
+		'itt_corporation':'manufacturing',
+		'multinational_companies':'del',
+		'weyerhaeuser':'forestry',
+		'geophysical_companies':'geology',
+		'prisa':'news',
+		'education_companies':'education',
+		'southern_company':'energy',
+		'montgomery_ward':'commerce',
+		'seafood_companies':'food & drink',
+		'design_companies':'del',
+		'avionics_companies':'air travel',
+		'rtl_group':'news',
+		'cloud_storage':'computer software',
+		'electronics_companies':'technology & computing',
+		'rosneft':'energy',
+		'offshoring':'business',
+		'mining_companies':'business',
+		'anime_companies':'comics',
+		'cms_energy':'energy',
+		'siemens':'technology & computing',
+		'plastics_companies':'business',
+		'marathon_oil':'energy',
+		'navistar_international':'pickup trucks',
+		'corporatism':'business',
+		'sistema':'business',
+		'bottling_companies':'del',
+		'hydro-québec':'energy',
+		'arco':'business',
+		'conocophillips':'energy',
+		'rpg_group':'business',
+		'keiretsu':'business',
+		'bse_sensex':'business',
+		'atco':'gardening',
+		'reliance_industries':'manufacturing',
+		'hutchison_whampoa':'business',
+		'basque_companies':'spain',
+		'semiconductor_companies':'technology & computing',
+		'vimpelcom_ltd.':'cell phones',
+		'dupont':'biotech',
+		'monopolies':'business',
+		'essel_group':'business',
+		'manufacturing_companies':'manufacturing',
+		'aniplex':'comics',
+		'neopets':'childrens',
+		'yukos':'energy',
+		'waste_companies':'logistics',
+		u'world_forestry': 'forestry',
+		u'sumba': 'indonesia',
+		u'rwe': 'energy',
+		u'strychnos': 'botany',
+		u'logging': 'forestry',
+		u'coal': 'energy',
+		u'seram_island': 'indonesia',
+		u'urban_forestry': 'forestry',
+	}
+	
+	#hope this will work in-place without any dictionary size change errors
+	for k,v in category_mapping.iteritems():
+		if k in corrections:
+			#make sure the new subcat exists
+			if corrections[k] not in all_cats:
+				print "{0} was not in all_cats! - wat do?"
+			else:
+				category_mapping[k] = corrections[k]
+	
+	#now check for del or del(_)parent
+	to_delete = set()
+	delparent = set()
+	for k,v in category_mapping.iteritems():
+		if v == 'del':
+			to_delete.update([k])
+		if (v == 'del_parent') or (v == 'delparent'):
+			delparent.update([k])
+	
+	for x in to_delete:
+		del category_mapping[x]
+	
+	print "delparent:"
+	print delparent
+	
+	return category_mapping
 
 def create_payload():
 	"""Handler function"""
@@ -1075,35 +1413,12 @@ def create_payload():
 	#now auto assign IAB categories to each category
 	category_mapping = generate_payload.assign_iab_categories(category_keyword_matrix, category_article_matrix) #this stage
 	
+	#make sure the categories aren't mistakes
+	category_mapping = resolve_mistakes(category_mapping)
+	
 	#now export those that need to be hand classified
 	#find_children_with_lots_of_children(category_mapping, cam)
 	generate_payload.find_consensus_classifications(category_article_matrix, category_mapping)
 	generate_payload.find_blank_parents(category_article_matrix, category_mapping)
 	generate_payload.find_unclassified_categories_with_lots_of_parents(category_article_matrix, category_mapping)
 	generate_payload.find_all_unclassified(category_mapping)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
