@@ -12,13 +12,14 @@
 // > lwca.classify("http://www.bbc.com/some_very_interesting_article", "Apple reveals shiny new gadget")
 // >>> ['computers', 0.75]
 
-var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is 
+var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
+var verbose = false
 
 function LWCAClassifier(){
 	// Main handler class
 	
 	//Initialize various processors
-	console.log("Initializing...")
+	if (verbose) console.log("Initializing...")
 	
 	let cdb = new ComponentDatabase() //objects that help match title components and query variables
 	//it also checks if it needs to be updated etc
@@ -31,49 +32,49 @@ function LWCAClassifier(){
 		//pre process
 			title = title.toLowerCase()
 			
-			console.log("Pre processing")
+			if (verbose) console.log("Pre processing")
 			//shortcuts
 			let sd = spotDefinites(url, title)
 			if (sd) {
-				console.log("Spotted definite match")
+				if (verbose) console.log("Spotted definite match")
 				return sd
 			}
 		
 			//cleaning
-			console.log("title before cleaning: " + title)
-			title = removePersistentTitleComponents(url, title, cdb.persistentTitleComponents)
+			if (verbose) console.log("title before cleaning: " + title)
+			title = removePersistentTitleChunks(url, title, cdb.persistentTitleChunks)
 			title = removeDomainNames(url, title) //try to remove domain names
-			console.log("after: " + title)
+			if (verbose) console.log("after: " + title)
 		
 		//classify
-			console.log("Classifying")
+			if (verbose) console.log("Classifying")
 			
-			console.log("Payload size is: " + Object.keys(payload).length)
-			console.log("DomainRules size is: " + Object.keys(domainRules).length)
+			if (verbose) console.log("Payload size is: " + Object.keys(payload).length)
+			if (verbose) console.log("DomainRules size is: " + Object.keys(domainRules).length)
 			
 			//cosine similarity
 			let scores = ce.classify(url, title)
 			
-			console.log("scores: " + scores)
+			if (verbose) console.log("scores: " + scores)
 			
 			if (scores.length == 0) {
 				return "Sorry, currently uncategorizable"
 			}
 		
 		//post process
-			console.log("Post processing")
+			if (verbose) console.log("Post processing")
 			
-			console.log('looking for domain scores')
+			if (verbose) console.log('looking for domain scores')
 			let domain_scores = augmentDomainMatchers(url, title, scores)
 			if (domain_scores != scores) {
-				console.log('adjusted!')
+				if (verbose) console.log('adjusted!')
 				return domain_scores.sort(sortDescendingBySecondElement)[0]
 			}
 			
 			//if that didn't change anything, last resort is using queries and repeats
-			console.log("trying query augmentation")
+			if (verbose) console.log("trying query augmentation")
 			scores = augmentQueries(url, scores, cdb.queryVariables)
-			console.log('scores: ' + scores)
+			if (verbose) console.log('scores: ' + scores)
 			//console.log("trying repeat word augmentation")
 			//scores = augmentRepeatWords(scores)
 			//console.log('scores: ' + scores)
@@ -82,7 +83,7 @@ function LWCAClassifier(){
 			scores = convertWikiToIAB(scores)
 		
 		//finish up
-			console.log("Finishing up")
+			if (verbose) console.log("Finishing up")
 			return scores.sort(sortDescendingBySecondElement)[0]
 		
 	}
@@ -112,58 +113,54 @@ function ComponentDatabase(create_objects=true) {
 	
 	//initialization
 	this.queryVariables = {}
-	this.persistentTitleComponents = {}
-	this.meta = {}
+	this.persistentTitleChunks = {}
+	this.meta = {'timestamp':0}
 	
 	this.init = function(){
-		console.log("Began the init function in Cdb")
+		if (verbose) console.log("Began the init function in Cdb")
 		let ts = this.find_start_and_end()
 		if (ts['start'] == 0) {
 			//nothing ever made before
+			if (verbose) console.log('Nothing found in local directory, so scanning the whole history')
 			let cdb = this.scan(ts['start'], ts['end'])
 			this.queryVariables = cdb['queryVariables']
-			this.persistentTitleComponents = cdb['persistentTitleComponents']
+			this.persistentTitleChunks = cdb['persistentTitleChunks']
 		}else{
 			//something made before, so load it
+			if (verbose) console.log('Found cdb in local directory, importing')
 			this.load_component_database()
 			
-			if (start_and_end['start'] != start_and_end['end']) {
-				//fill in the rest
-				let cdb = this.scan(ts['start'], ts['end'])
-				//then merge the new stuff with the old stuff
-				
-				//first query variables
-				for (let domain in cdb['queryVariables']) {
-					if (this.queryVariables.hasOwnProperty(domain) == false) {
-						this.queryVariables[domain] = {}
-					}
-					for (let v of cdb['queryVariables'][domain]) {
-						if (this.queryVariables[domain].hasOwnProperty(v) == false) {
-							this.queryVariables[domain][v] = 1
-						}
+			
+			//fill in the rest
+			let cdb = this.scan(ts['start'], ts['end'])
+			//then merge the new stuff with the old stuff
+			
+			//first query variables
+			for (let domain in cdb['queryVariables']) {
+				if (this.queryVariables.hasOwnProperty(domain) == false) {
+					this.queryVariables[domain] = {}
+				}
+				for (let v of cdb['queryVariables'][domain]) {
+					if (this.queryVariables[domain].hasOwnProperty(v) == false) {
+						this.queryVariables[domain][v] = 1
 					}
 				}
-				
-				//then title components
-				for (let domain in cdb['persistentTitleComponents']) {
-					if (this.persistentTitleComponents.hasOwnProperty(domain) == false) {
-						this.persistentTitleComponents[domain] = {}
-					}
-					for (let v of cdb['persistentTitleComponents'][domain]) {
-						if (this.persistentTitleComponents[domain].hasOwnProperty(v) == false) {
-							this.persistentTitleComponents[domain][v] = 1
-						}
-					}
-				}
-				
-				console.log('loaded existing cdb from disc')
 			}
+			
+			//then title components
+			for (let domain in cdb['persistentTitleChunks']) {
+				if (this.persistentTitleChunks.hasOwnProperty(domain) == false) {
+					this.persistentTitleChunks[domain] = {}
+				}
+				for (let v of cdb['persistentTitleChunks'][domain]) {
+					if (this.persistentTitleChunks[domain].hasOwnProperty(v) == false) {
+						this.persistentTitleChunks[domain][v] = 1
+					}
+				}
+			}
+			if (verbose) console.log('loaded existing cdb from disc')
 		}
-		
-		//alter scanner to return dictionary rather than write to main object
-		
-		//now save everything
-		this.save()
+		this.save() //now save everything
 	}
 	
 	this.find_start_and_end = function(){
@@ -179,12 +176,13 @@ function ComponentDatabase(create_objects=true) {
 		cont.containerOpen = false;
 		
 		
-		this.load_meta() //find last url visited's id
-		if (Object.keys(this.meta).length == 0) {
-			console.log('Could not find any meta information. Everything needs to be scanned. Please create a component database first')
+		lm = this.load_meta() //find last url visited's id
+		if (lm == false) {
+			if (verbose) console.log('Could not find any meta information. Everything needs to be scanned. Please create a component database first')
 			return {'start': 0, 'end': latest_timestamp}
-		}else{	
-			return {'start': this.meta['timestamp'], 'end':latest_visit_url} //start and ending timestamps of whatever needs to be updated
+		}else{
+			if (verbose) console.log('Found meta information on disc (ts: ' + this.meta['timestamp'] + ")")
+			return {'start': this.meta['timestamp'], 'end':latest_timestamp} //start and ending timestamps of whatever needs to be updated
 		}
 	}
 	
@@ -229,10 +227,14 @@ function ComponentDatabase(create_objects=true) {
 				}
 				history_total += 1
 			}
+			if (visit[2] > this.meta['timestamp']) {
+				this.meta['timestamp'] = visit[2] //timestamp is now last item loaded
+			}
 		}
-		console.log("Total history items loaded: " + history_total)
 		
-		console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
+		if (verbose) console.log("Total history items loaded: " + history_total)
+		
+		if (verbose) console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
 		//what are the most common suffixes?
 		
 		//first some sort of stats
@@ -272,18 +274,28 @@ function ComponentDatabase(create_objects=true) {
 			ptc[domain] = to_add
 		}
 		
-		console.log('Done!')
-		return {'persistentTitleComponents':ptc, 'queryVariables':qv}
+		//now remove anything empty
+		to_delete = []
+		for (let x in ptc) {if (ptc[x].length == 0) {to_delete.push(x)}}
+		for (let x of to_delete){delete ptc[x]}
+		
+		//return
+		if (verbose) console.log('Done!')
+		return {'persistentTitleChunks':ptc, 'queryVariables':qv}
 	}
 	
 	this.load_meta = function(){
+		if (verbose) console.log("load_meta function called")
 		//load meta
 		let decoder = new TextDecoder();
 		let promise = OS.File.read("meta.json");
 		promise = promise.then(
 		  function onSuccess(array) {
+			if (verbose) console.log('onSuccess for meta loading called')
 			let info = decoder.decode(array);
-			this.meta = JSON.parse(info)
+			data = JSON.parse(info)
+			if (verbose) console.log('meta data found was: ' + JSON.stringify(data))
+			this.meta = data
 			return true //loads meta information into an object with timestamp and id
 		  },
 		  function onFailure(){
@@ -301,7 +313,7 @@ function ComponentDatabase(create_objects=true) {
 			let info = decoder.decode(array);
 			info = JSON.parse(info)
 			this.queryVariables = info['queryVariables']
-			this.persistentTitleComponents = info['persistentTitleComponents']
+			this.persistentTitleChunks = info['persistentTitleChunks']
 			return true
 		  },
 		  function onFailure(){
@@ -313,12 +325,12 @@ function ComponentDatabase(create_objects=true) {
 	this.save = function(){
 		//assumes that both cdb and meta have been created
 		let encoder = new TextEncoder();
-		let meta = encoder.encode(this.meta);
-		let cdb = encoder.encode({'queryVariables':this.queryVariables, 'persistentTitleComponents':this.persistentTitleComponents});
+		let meta_enc = encoder.encode(JSON.stringify(this.meta));
+		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
 		//save meta
-		let promise = OS.File.writeAtomic("meta.json", array, {tmpPath: "meta.json.tmp"});
+		let promise = OS.File.writeAtomic("meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
 		//save component database
-		let promise = OS.File.writeAtomic("cdb.json", array, {tmpPath: "cdb.json.tmp"});
+		let promise = OS.File.writeAtomic("cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
 	}
 	
 	if (create_objects==true) {
@@ -326,7 +338,7 @@ function ComponentDatabase(create_objects=true) {
 	}
 }
 
-function removePersistentTitleComponents(url, title, cdb){
+function removePersistentTitleChunks(url, title, cdb){
 	//Removes common title endings such as " - Google Search" using the component database
 	
 	domain = getDomain(url)
@@ -616,7 +628,7 @@ function augmentDomainMatchers(url, title, results) {
 					
 					if (match_count == tokens.length) {
 						decision = category_matchers[k]
-						console.log("Exact token match found")
+						if (verbose) console.log("Exact token match found")
 						break
 					}
 				}
@@ -625,7 +637,7 @@ function augmentDomainMatchers(url, title, results) {
 			//check if decision was made
 			if (decision == false) {
 				if (category_matchers.hasOwnProperty("__ANY")) { //if not, look at __ANY
-					console.log("No exact title token match found, so going with __ANY, which is: " + category_matchers['__ANY'])
+					if (verbose) console.log("No exact title token match found, so going with __ANY, which is: " + category_matchers['__ANY'])
 					decision = category_matchers['__ANY']
 				}else{
 					return results //if there's still nothing, just return the original results from the argument
@@ -662,14 +674,14 @@ function augmentQueries(url, results, queryDatabase) {
 	//Tries to spot any search queries in the url
 	//Doubles the score of anything that contains a search query word
 	
-	console.log("URL: " + url)
+	if (verbose) console.log("URL: " + url)
 	
 	queries = [] //a list of strings
 	url = parseUri(url) //
 	
 	if (queryDatabase.hasOwnProperty(url.host)) { //if the domain is in the db
-		console.log("Domain: " + url.host + " is in the database")
-		console.log("There are " + Object.keys(url.queryKey).length + " keys in the url")
+		if (verbose) console.log("Domain: " + url.host + " is in the database")
+		if (verbose) console.log("There are " + Object.keys(url.queryKey).length + " keys in the url")
 		for (let variable in url.queryKey) { //iterate through url get variables
 			if (queryDatabase[url.host].hasOwnProperty(variable)) { //if in the db
 				query = unescape(url.queryKey[variable]) //append to list
@@ -681,7 +693,7 @@ function augmentQueries(url, results, queryDatabase) {
 	//now find any result that contains a query word
 	if (queries.length > 0) {
 		for(let result in results){
-			console.log("Iterating through results")
+			if (verbose) console.log("Iterating through results")
 			for (let word of queries) {
 				if (results[result][0].indexOf(word) != -1) {
 					results[result][1] *= 2 //double the score
@@ -706,7 +718,7 @@ function convertWikiToIAB(results, level="top") {
 		if (new_mappings.hasOwnProperty(cat)) {
 			new_results.push([new_mappings[cat], r[1]])
 		}else{
-			console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
+			if (verbose) console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
 		}
 	}
 	
@@ -716,7 +728,7 @@ function convertWikiToIAB(results, level="top") {
 		for (let result of results) { //get frequencies per top level
 			let wiki_cat_name = result[0].toLowerCase()
 			let iab_mapping = new_mappings[wiki_cat_name]
-			console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
+			if (verbose) console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
 			
 			top_level = 0
 			
@@ -744,7 +756,7 @@ function convertWikiToIAB(results, level="top") {
 		for (let result of results) { //return the best of all levels
 			let wiki_cat_name = result[0].toLowerCase() //bit too much code repetition here
 			let iab_mapping = new_mappings[wiki_cat_name]
-			console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
+			if (verbose) console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
 			if (iab_mapping != undefined) {
 				if (counts.hasOwnProperty(iab_mapping)) {
 					counts[iab_mapping] = 1
@@ -755,7 +767,7 @@ function convertWikiToIAB(results, level="top") {
 		}
 	}
 	
-	console.log('counts: ' + JSON.stringify(counts))
+	if (verbose) console.log('counts: ' + JSON.stringify(counts))
 	
 	//get top 2
 	counts_list = []
