@@ -116,6 +116,7 @@ function ComponentDatabase(create_objects=true) {
 	this.meta = {}
 	
 	this.init = function(){
+		console.log("Began the init function in Cdb")
 		let ts = this.find_start_and_end()
 		if (ts['start'] == 0) {
 			//nothing ever made before
@@ -785,9 +786,9 @@ function convertWikiToIAB(results, level="top") {
 
 const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 const {data} = require("sdk/self"); //not quite sure why this is necessary
-const {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
-const historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
-const scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
+let {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
+let historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
+let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
 scriptLoader.loadSubScript(data.url("domainRules.json")); 
 scriptLoader.loadSubScript(data.url("payload.json")); //TODO: combine payload and mapping
 scriptLoader.loadSubScript(data.url("new_mappings.json")); 
