@@ -107,110 +107,221 @@ function spotDefinites(url, title){
 	return false //false if nothing found
 }
 
-function handleCDB(){
-	//handles decisions to make/update/return CDB
-	
-	cdb = loadComponentDatabase()
-	if (cdb==false) {
-		//make a new one
-		cdb = ComponentDatabase()
-	}else{
-		//check for updates
-	}
-	
-	return cdb
-}
-
-function ComponentDatabase() {
+function ComponentDatabase(create_objects=true) {
 	//creates a database of known query variables and persistent title components
 	
 	//initialization
 	this.queryVariables = {}
 	this.persistentTitleComponents = {}
-	let history = getHistory()
+	this.meta = {}
 	
-	//try and do the two together
-	//arrange visits by domain
-	let domain_titles = {}
-
-	history_total = 0
-	for (let visit of history){
-		
-		url = visit[0]
-		url = parseUri(url)
-		let domain = url.host
-		
-		//scan components
-		for (let var_name in url.queryKey) {
-			if (spaceFinder.test(url.queryKey[var_name])) {
-				//Note: the following spaghetti is why you use a decent language like python
-				//with sets/defaultdicts
-				if (this.queryVariables.hasOwnProperty(domain) == false) {
-					this.queryVariables[domain] = {}
-				}
-				if (this.queryVariables[domain].hasOwnProperty(var_name) == false) {
-					this.queryVariables[domain][var_name] = 0
-				}
-				this.queryVariables[domain][var_name] += 1
-			}
-		}
-		
-		//sort title
-		if (domain_titles.hasOwnProperty(domain)==false) {
-			domain_titles[domain] = []
-		}
-		
-		if (visit[1] != null) {
-			domain_titles[domain].push(visit[1])
-		}
-		history_total += 1
-	}
-	console.log("Total history items loaded: " + history_total)
-	
-	console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
-	//what are the most common suffixes?
-	
-	//first some sort of stats
-	total_domains = Object.keys(domain_titles).length
-	count = 0
-	increment = total_domains / 100 //TODO
-	
-	//now for processing
-	for (let domain in domain_titles){
-		let suffixes = {}
-		let titles = domain_titles[domain]
-		for (let x=0;x<titles.length;x++){
-			for (let y=x+1;y<titles.length;y++){
-				if (titles[x]!=titles[y]) {
-					let lcns = longestCommonNgramSuffix(titles[x], titles[y])
-					if (lcns!=false) {
-						if (suffixes.hasOwnProperty(lcns) == false) {
-							suffixes[lcns] = 0
+	this.init = function(){
+		let ts = this.find_start_and_end()
+		if (ts['start'] == 0) {
+			//nothing ever made before
+			let cdb = this.scan(ts['start'], ts['end'])
+			this.queryVariables = cdb['queryVariables']
+			this.persistentTitleComponents = cdb['persistentTitleComponents']
+		}else{
+			//something made before, so load it
+			this.load_component_database()
+			
+			if (start_and_end['start'] != start_and_end['end']) {
+				//fill in the rest
+				let cdb = this.scan(ts['start'], ts['end'])
+				//then merge the new stuff with the old stuff
+				
+				//first query variables
+				for (let domain in cdb['queryVariables']) {
+					if (this.queryVariables.hasOwnProperty(domain) == false) {
+						this.queryVariables[domain] = {}
+					}
+					for (let v of cdb['queryVariables'][domain]) {
+						if (this.queryVariables[domain].hasOwnProperty(v) == false) {
+							this.queryVariables[domain][v] = 1
 						}
-						suffixes[lcns] += 1
 					}
 				}
 				
+				//then title components
+				for (let domain in cdb['persistentTitleComponents']) {
+					if (this.persistentTitleComponents.hasOwnProperty(domain) == false) {
+						this.persistentTitleComponents[domain] = {}
+					}
+					for (let v of cdb['persistentTitleComponents'][domain]) {
+						if (this.persistentTitleComponents[domain].hasOwnProperty(v) == false) {
+							this.persistentTitleComponents[domain][v] = 1
+						}
+					}
+				}
+				
+				console.log('loaded existing cdb from disc')
 			}
 		}
-		//eliminate those that only appear once 
-		let to_add = []
-		for (let suffix in suffixes) {
-			let count = suffixes[suffix]
-			if (count > 1) {
-				to_add.push(suffix)
-			}
-		}
-		//to_add must be sorted in descending order of length
-		//as largest matches should be eliminated first
-		to_add = to_add.sort(sortDescendingByElementLength)
-		this.persistentTitleComponents[domain] = to_add
-	}
-	console.log('Done!')
-	
-	//auxiliary functions to save it
-	this.save = function(){
 		
+		//alter scanner to return dictionary rather than write to main object
+		
+		//now save everything
+		this.save()
+	}
+	
+	this.find_start_and_end = function(){
+		//where to start and end the scanning (if any)
+		
+		//mostly a copy of get_history
+		let options = historyService.getNewQueryOptions(); //make a blank query
+		let query = historyService.getNewQuery();
+		let result = historyService.executeQuery(query, options);
+		let cont = result.root;
+		cont.containerOpen = true;
+		latest_timestamp = cont.getChild(0).time //this is the last url that the user visited, which is the 'end'
+		cont.containerOpen = false;
+		
+		
+		this.load_meta() //find last url visited's id
+		if (Object.keys(this.meta).length == 0) {
+			console.log('Could not find any meta information. Everything needs to be scanned. Please create a component database first')
+			return {'start': 0, 'end': latest_timestamp}
+		}else{	
+			return {'start': this.meta['timestamp'], 'end':latest_visit_url} //start and ending timestamps of whatever needs to be updated
+		}
+	}
+	
+	this.scan = function(start, end){
+		let history = getHistory()
+		//try and do the two together
+		//arrange visits by domain
+		
+		let qv = {} //query variables
+		let ptc = {} //persistent title components
+		let domain_titles = {}
+		
+		history_total = 0
+		for (let visit of history){
+			if ((visit[2]>=start) && (visit[2]<=end)) {
+				url = visit[0]
+				url = parseUri(url)
+				let domain = url.host
+				
+				//scan components
+				for (let var_name in url.queryKey) {
+					if (spaceFinder.test(url.queryKey[var_name])) {
+						//Note: the following spaghetti is why you use a decent language like python
+						//with sets/defaultdicts
+						if (qv.hasOwnProperty(domain) == false) {
+							qv[domain] = {}
+						}
+						if (qv[domain].hasOwnProperty(var_name) == false) {
+							qv[domain][var_name] = 0
+						}
+						qv[domain][var_name] += 1
+					}
+				}
+				
+				//sort title
+				if (domain_titles.hasOwnProperty(domain)==false) {
+					domain_titles[domain] = []
+				}
+				
+				if (visit[1] != null) {
+					domain_titles[domain].push(visit[1])
+				}
+				history_total += 1
+			}
+		}
+		console.log("Total history items loaded: " + history_total)
+		
+		console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
+		//what are the most common suffixes?
+		
+		//first some sort of stats
+		total_domains = Object.keys(domain_titles).length
+		count = 0
+		increment = total_domains / 100 //TODO
+		
+		//now for processing
+		for (let domain in domain_titles){
+			let suffixes = {}
+			let titles = domain_titles[domain]
+			for (let x=0;x<titles.length;x++){
+				for (let y=x+1;y<titles.length;y++){
+					if (titles[x]!=titles[y]) {
+						let lcns = longestCommonNgramSuffix(titles[x], titles[y])
+						if (lcns!=false) {
+							if (suffixes.hasOwnProperty(lcns) == false) {
+								suffixes[lcns] = 0
+							}
+							suffixes[lcns] += 1
+						}
+					}
+					
+				}
+			}
+			//eliminate those that only appear once 
+			let to_add = []
+			for (let suffix in suffixes) {
+				let count = suffixes[suffix]
+				if (count > 1) {
+					to_add.push(suffix)
+				}
+			}
+			//to_add must be sorted in descending order of length
+			//as largest matches should be eliminated first
+			to_add = to_add.sort(sortDescendingByElementLength)
+			ptc[domain] = to_add
+		}
+		
+		console.log('Done!')
+		return {'persistentTitleComponents':ptc, 'queryVariables':qv}
+	}
+	
+	this.load_meta = function(){
+		//load meta
+		let decoder = new TextDecoder();
+		let promise = OS.File.read("meta.json");
+		promise = promise.then(
+		  function onSuccess(array) {
+			let info = decoder.decode(array);
+			this.meta = JSON.parse(info)
+			return true //loads meta information into an object with timestamp and id
+		  },
+		  function onFailure(){
+			return false //file doesn't exist
+		  }
+		);
+	}
+	
+	this.load_component_database = function(){
+		//loads the component database if it exists, else returns false
+		let decoder = new TextDecoder();
+		let promise = OS.File.read("cdb.json");
+		promise = promise.then(
+		  function onSuccess(array) {
+			let info = decoder.decode(array);
+			info = JSON.parse(info)
+			this.queryVariables = info['queryVariables']
+			this.persistentTitleComponents = info['persistentTitleComponents']
+			return true
+		  },
+		  function onFailure(){
+			return false //file doesn't exist
+		  }
+		);
+	}
+	
+	this.save = function(){
+		//assumes that both cdb and meta have been created
+		let encoder = new TextEncoder();
+		let meta = encoder.encode(this.meta);
+		let cdb = encoder.encode({'queryVariables':this.queryVariables, 'persistentTitleComponents':this.persistentTitleComponents});
+		//save meta
+		let promise = OS.File.writeAtomic("meta.json", array, {tmpPath: "meta.json.tmp"});
+		//save component database
+		let promise = OS.File.writeAtomic("cdb.json", array, {tmpPath: "cdb.json.tmp"});
+	}
+	
+	if (create_objects==true) {
+		this.init() //called when created. Can set the arg to false if you just want to access random functions
 	}
 }
 
@@ -582,31 +693,6 @@ function augmentQueries(url, results, queryDatabase) {
 	return results
 }
 
-//function convertWikiToIAB(results, level="top") {
-//	//converts a set of wiki categories to IAB categories
-//	//options for level are:
-//	// - top, lower, all
-//	//at the moment just does top level
-//	
-//	new_results = []
-//	
-//	if (level==='top') {
-//		for (let r of results) {
-//			let cat = r[0].toLowerCase()
-//			if (new_mappings.hasOwnProperty(cat)) {
-//				new_results.push([new_mappings[cat], r[1]])
-//			}else{
-//				console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
-//			}
-//		}
-//	}else{
-//		return "Not yet implemented."
-//	}
-//	
-//	return new_results
-//	
-//}
-
 function convertWikiToIAB(results, level="top") {
 	//converts a set of wiki categories to IAB categories
 	//options for level are:
@@ -699,8 +785,9 @@ function convertWikiToIAB(results, level="top") {
 
 const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 const {data} = require("sdk/self"); //not quite sure why this is necessary
-//const {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
-let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
+const {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
+const historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
+const scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
 scriptLoader.loadSubScript(data.url("domainRules.json")); 
 scriptLoader.loadSubScript(data.url("payload.json")); //TODO: combine payload and mapping
 scriptLoader.loadSubScript(data.url("new_mappings.json")); 
@@ -726,9 +813,6 @@ function getDomain(url) {
 function getHistory(){
 	//Generator that yields the most recent history urls one by one
 	//Returned in the form [url, title, timestamp]
-	
-	//create the history service
-	let historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
 
 	//make a blank query
 	let options = historyService.getNewQueryOptions();
@@ -835,59 +919,7 @@ function sortDescendingByElementLength(first, second) {
 	return second.length - first.length
 }
 
-//Object persistence on disc
-// 1. cdb (Component database of title chunks and query variables)
-// 2. meta - timestamp and id of last visit processed
-// 3. classificaitons - 
-
-//1
-function saveComponentDatabase(db){
-	//saves a component database to the cdb.json file
-	let encoder = new TextEncoder();
-	let array = encoder.encode(db);
-	let promise = OS.File.writeAtomic("cdb.json", array, {tmpPath: "cdb.json.tmp"});
-}
-
-function loadComponentDatabase(){
-	//loads the component database if it exists, else returns false
-	let decoder = new TextDecoder();
-	let promise = OS.File.read("cdb.json");
-	promise = promise.then(
-	  function onSuccess(array) {
-		let info = decoder.decode(array);
-		return JSON.parse(info)
-	  },
-	  function onFailure(){
-		return false //file doesn't exist
-	  }
-	);
-}
-
-//2
-
-function loadMeta(){
-	//loads meta information into an object with timestamp and id
-	let decoder = new TextDecoder();
-	let promise = OS.File.read("meta.json");
-	promise = promise.then(
-	  function onSuccess(array) {
-		let info = decoder.decode(array);
-		return JSON.parse(info)
-	  },
-	  function onFailure(){
-		return false //file doesn't exist
-	  }
-	);
-}
-
-function saveMeta(timestamp_and_info){
-	//saves a dictionary of meta information (two keys: timestamp, id) to meta.json
-	let encoder = new TextEncoder();
-	let array = encoder.encode(timestamp_and_info);
-	let promise = OS.File.writeAtomic("meta.json", array, {tmpPath: "meta.json.tmp"});
-}
-
-//3
+//Classification persistence on disc
 
 function saveClassifications(visit_id_to_iab_lower){
 	//creates an id-iab mapping for brevity
