@@ -19,7 +19,10 @@ function LWCAClassifier(){
 	
 	//Initialize various processors
 	console.log("Initializing...")
-	let cdb = new ComponentDatabase() //helps match title components and query variables
+	
+	let cdb = new ComponentDatabase() //objects that help match title components and query variables
+	//it also checks if it needs to be updated etc
+	
 	let ce = new ClassificationEngine()
 	
 	//Handle requests
@@ -54,7 +57,7 @@ function LWCAClassifier(){
 			console.log("scores: " + scores)
 			
 			if (scores.length == 0) {
-				return false
+				return "Sorry, currently uncategorizable"
 			}
 		
 		//post process
@@ -103,6 +106,76 @@ function spotDefinites(url, title){
 	
 	return false //false if nothing found
 }
+
+//function saveComponentDatabase(db){
+//	//saves a component database to the cdb.json file
+//	let encoder = new TextEncoder();
+//	let array = encoder.encode(db);
+//	let promise = OS.File.writeAtomic("cdb.json", array, {tmpPath: "cdb.json.tmp"});
+//}
+//
+//function loadComponentDatabase(){
+//	//loads the component database if it exists, else returns false
+//	let decoder = new TextDecoder();
+//	let promise = OS.File.read("cdb.json");
+//	promise = promise.then(
+//	  function onSuccess(array) {
+//		let info = decoder.decode(array);
+//		return JSON.parse(info)
+//	  },
+//	  function onFailure(){
+//		return false //file doesn't exist
+//	  }
+//	);
+//}
+//
+//function loadCDBConfig(){
+//	//loads configuration options from CDB
+//	//At the moment this is just the date of the last URL classified
+//	
+//	//loads the component database if it exists, else returns false
+//	let decoder = new TextDecoder();
+//	let promise = OS.File.read("cdb.config");
+//	promise = promise.then(
+//	  function onSuccess(array) {
+//		let info = decoder.decode(array);
+//		info = JSON.parse(info)
+//		return info
+//	  },
+//	  function onFailure(){
+//		return false //file doesn't exist
+//	  }
+//	);
+//	
+//}
+//
+//function saveCDBConfig(timestamp_of_last_url, last_id){
+//	//saves a timestamp and file id to a file
+//	
+//	let encoder = new TextEncoder();
+//	
+//	let info = {
+//		'las_timestamp': timestamp_of_last_url,
+//		'last_id': last_id
+//	}
+//	
+//	let array = encoder.encode(info);
+//	let promise = OS.File.writeAtomic("cdb.config", array, {tmpPath: "cdb.config.tmp"});
+//}
+//
+//function handleCDB(){
+//	//handles decisions to make/update/return CDB
+//	
+//	cdb = loadComponentDatabase()
+//	if (cdb==false) {
+//		//make a new one
+//		cdb = ComponentDatabase()
+//	}else{
+//		//check for updates
+//	}
+//	
+//	return cdb
+//}
 
 function ComponentDatabase() {
 	//creates a database of known query variables and persistent title components
@@ -560,39 +633,129 @@ function augmentQueries(url, results, queryDatabase) {
 	return results
 }
 
+//function convertWikiToIAB(results, level="top") {
+//	//converts a set of wiki categories to IAB categories
+//	//options for level are:
+//	// - top, lower, all
+//	//at the moment just does top level
+//	
+//	new_results = []
+//	
+//	if (level==='top') {
+//		for (let r of results) {
+//			let cat = r[0].toLowerCase()
+//			if (new_mappings.hasOwnProperty(cat)) {
+//				new_results.push([new_mappings[cat], r[1]])
+//			}else{
+//				console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
+//			}
+//		}
+//	}else{
+//		return "Not yet implemented."
+//	}
+//	
+//	return new_results
+//	
+//}
+
 function convertWikiToIAB(results, level="top") {
 	//converts a set of wiki categories to IAB categories
 	//options for level are:
-	// - top, lower, all
-	//at the moment just does top level
+	// - top, all
 	
 	new_results = []
 	
+	for (let r of results) {
+		let cat = r[0].toLowerCase()
+		if (new_mappings.hasOwnProperty(cat)) {
+			new_results.push([new_mappings[cat], r[1]])
+		}else{
+			console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
+		}
+	}
+	
+	let counts = {}
 	if (level==='top') {
-		for (let r of results) {
-			let cat = r[0].toLowerCase()
-			if (new_mappings.hasOwnProperty(cat)) {
-				new_results.push([new_mappings[cat], r[1]])
+		//bring everything to the top level
+		for (let result of results) { //get frequencies per top level
+			let wiki_cat_name = result[0].toLowerCase()
+			let iab_mapping = new_mappings[wiki_cat_name]
+			console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
+			
+			top_level = 0
+			
+			//could be top level
+			if (tree.hasOwnProperty(iab_mapping)){
+				top_level = iab_mapping
 			}else{
-				console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
+				for (let tlcat in tree) {
+					if (tree[tlcat].indexOf(iab_mapping) != -1) {
+						top_level = tlcat
+						break
+					}
+				}
+			}
+			
+			if (top_level != 0) {
+				if (counts.hasOwnProperty(top_level) == false) {
+					counts[top_level] = 1
+				}else{
+					counts[top_level] += 1
+				}
 			}
 		}
 	}else{
-		return "Not yet implemented."
+		for (let result of results) { //return the best of all levels
+			let wiki_cat_name = result[0].toLowerCase() //bit too much code repetition here
+			let iab_mapping = new_mappings[wiki_cat_name]
+			console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
+			if (iab_mapping != undefined) {
+				if (counts.hasOwnProperty(iab_mapping)) {
+					counts[iab_mapping] = 1
+				}else{
+					counts[iab_mapping] += 1
+				}
+			}
+		}
 	}
 	
-	return new_results
+	console.log('counts: ' + JSON.stringify(counts))
 	
+	//get top 2
+	counts_list = []
+	for (let key in counts) {counts_list.push([key, counts[key]])} //convert to list
+	counts_list.sort(sortDescendingBySecondElement)
+	
+	//messy error handling
+	if (counts_list.length == 0) {
+		return ['Sorry, currently uncategorizable']
+	}
+	
+	//if the top two are the same, then return the category that is associated with
+	//otherwise just return #1
+	if (counts_list.length == 1) {
+		return [counts_list[0][0]]
+	}else{
+		if (counts_list[0][0] === counts_list[1][0]) {
+			//return the iab of #1
+			return [new_mappings[results[0][0].toLowerCase()]]
+		}else{
+			//return the top one of those
+			return [counts_list[0][0]]
+		}
+	}
 }
 
 // Auxiliary functions, matchers, options etc
 
 const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 const {data} = require("sdk/self"); //not quite sure why this is necessary
+//const {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
 let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
-scriptLoader.loadSubScript(data.url("domainRules.json")); //TODO: test this, also clean up the file
-scriptLoader.loadSubScript(data.url("payload.json")); //TODO: test this TODO is this only the final 4.4k?
-scriptLoader.loadSubScript(data.url("new_mappings.json")); //TODO: test this
+scriptLoader.loadSubScript(data.url("domainRules.json")); 
+scriptLoader.loadSubScript(data.url("payload.json")); //TODO: combine payload and mapping
+scriptLoader.loadSubScript(data.url("new_mappings.json")); 
+scriptLoader.loadSubScript(data.url("mozcat_heirarchy.json")); 
 
 function getDomain(url) {
 	//returns the (sub)domain of a url
