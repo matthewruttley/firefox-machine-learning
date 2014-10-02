@@ -95,7 +95,7 @@ function spotDefinites(url, title){
 	//e.g. "real estate" is definitely real estate
 	
 	let definites = {
-		"real estate": "Real Estate", //TODO: moarr
+		"real estate": "real estate", //TODO: moarr
 	}
 	
 	for (let definiteMatch in definites) {
@@ -107,75 +107,19 @@ function spotDefinites(url, title){
 	return false //false if nothing found
 }
 
-//function saveComponentDatabase(db){
-//	//saves a component database to the cdb.json file
-//	let encoder = new TextEncoder();
-//	let array = encoder.encode(db);
-//	let promise = OS.File.writeAtomic("cdb.json", array, {tmpPath: "cdb.json.tmp"});
-//}
-//
-//function loadComponentDatabase(){
-//	//loads the component database if it exists, else returns false
-//	let decoder = new TextDecoder();
-//	let promise = OS.File.read("cdb.json");
-//	promise = promise.then(
-//	  function onSuccess(array) {
-//		let info = decoder.decode(array);
-//		return JSON.parse(info)
-//	  },
-//	  function onFailure(){
-//		return false //file doesn't exist
-//	  }
-//	);
-//}
-//
-//function loadCDBConfig(){
-//	//loads configuration options from CDB
-//	//At the moment this is just the date of the last URL classified
-//	
-//	//loads the component database if it exists, else returns false
-//	let decoder = new TextDecoder();
-//	let promise = OS.File.read("cdb.config");
-//	promise = promise.then(
-//	  function onSuccess(array) {
-//		let info = decoder.decode(array);
-//		info = JSON.parse(info)
-//		return info
-//	  },
-//	  function onFailure(){
-//		return false //file doesn't exist
-//	  }
-//	);
-//	
-//}
-//
-//function saveCDBConfig(timestamp_of_last_url, last_id){
-//	//saves a timestamp and file id to a file
-//	
-//	let encoder = new TextEncoder();
-//	
-//	let info = {
-//		'las_timestamp': timestamp_of_last_url,
-//		'last_id': last_id
-//	}
-//	
-//	let array = encoder.encode(info);
-//	let promise = OS.File.writeAtomic("cdb.config", array, {tmpPath: "cdb.config.tmp"});
-//}
-//
-//function handleCDB(){
-//	//handles decisions to make/update/return CDB
-//	
-//	cdb = loadComponentDatabase()
-//	if (cdb==false) {
-//		//make a new one
-//		cdb = ComponentDatabase()
-//	}else{
-//		//check for updates
-//	}
-//	
-//	return cdb
-//}
+function handleCDB(){
+	//handles decisions to make/update/return CDB
+	
+	cdb = loadComponentDatabase()
+	if (cdb==false) {
+		//make a new one
+		cdb = ComponentDatabase()
+	}else{
+		//check for updates
+	}
+	
+	return cdb
+}
 
 function ComponentDatabase() {
 	//creates a database of known query variables and persistent title components
@@ -263,6 +207,11 @@ function ComponentDatabase() {
 		this.persistentTitleComponents[domain] = to_add
 	}
 	console.log('Done!')
+	
+	//auxiliary functions to save it
+	this.save = function(){
+		
+	}
 }
 
 function removePersistentTitleComponents(url, title, cdb){
@@ -886,4 +835,132 @@ function sortDescendingByElementLength(first, second) {
 	return second.length - first.length
 }
 
-exports.LWCAClassifier = LWCAClassifier //for the extension main.js to access
+//Object persistence on disc
+// 1. cdb (Component database of title chunks and query variables)
+// 2. meta - timestamp and id of last visit processed
+// 3. classificaitons - 
+
+//1
+function saveComponentDatabase(db){
+	//saves a component database to the cdb.json file
+	let encoder = new TextEncoder();
+	let array = encoder.encode(db);
+	let promise = OS.File.writeAtomic("cdb.json", array, {tmpPath: "cdb.json.tmp"});
+}
+
+function loadComponentDatabase(){
+	//loads the component database if it exists, else returns false
+	let decoder = new TextDecoder();
+	let promise = OS.File.read("cdb.json");
+	promise = promise.then(
+	  function onSuccess(array) {
+		let info = decoder.decode(array);
+		return JSON.parse(info)
+	  },
+	  function onFailure(){
+		return false //file doesn't exist
+	  }
+	);
+}
+
+//2
+
+function loadMeta(){
+	//loads meta information into an object with timestamp and id
+	let decoder = new TextDecoder();
+	let promise = OS.File.read("meta.json");
+	promise = promise.then(
+	  function onSuccess(array) {
+		let info = decoder.decode(array);
+		return JSON.parse(info)
+	  },
+	  function onFailure(){
+		return false //file doesn't exist
+	  }
+	);
+}
+
+function saveMeta(timestamp_and_info){
+	//saves a dictionary of meta information (two keys: timestamp, id) to meta.json
+	let encoder = new TextEncoder();
+	let array = encoder.encode(timestamp_and_info);
+	let promise = OS.File.writeAtomic("meta.json", array, {tmpPath: "meta.json.tmp"});
+}
+
+//3
+
+function saveClassifications(visit_id_to_iab_lower){
+	//creates an id-iab mapping for brevity
+	//saves that, and a mapping of visit id to classification id
+	
+	//create tree mapping using mozcat heirarchy
+	iab_ids = {}
+	count = 0
+	for (let top_level in tree) {
+		iab_ids[top_level] = count
+		count += 1
+		for(let subcat in tree[top_level]){
+			iab_ids[subcat] = count
+			count += 1
+		}
+	}
+	
+	//map classifications
+	classifications = {}
+	for (let visit_id in visit_id_to_iab_lower) {
+		iab = visit_id_to_iab_lower[visit_id]
+		mapping = iab_ids[iab]
+		classifications[visit_id] = mapping
+	}
+	
+	//now put everything together
+	
+	everything = {
+		'mapping': iab_ids,
+		'classifications': classifications
+	}
+	
+	//now save
+	
+	let encoder = new TextEncoder();
+	let array = encoder.encode(everything);
+	let promise = OS.File.writeAtomic("classifications.json", array, {tmpPath: "classifications.json.tmp"});
+	
+}
+
+function loadClassifications(){
+	//returns an id to iab mapping
+		//loads meta information into an object with timestamp and id
+	let decoder = new TextDecoder();
+	let promise = OS.File.read("meta.json");
+	promise = promise.then(
+	  function onSuccess(array) {
+		let info = decoder.decode(array);
+		info = JSON.parse(info)
+		
+		//now expand it
+		//create an id-to-text version of the mapping
+		id_to_text = {}
+		for (let iab in info['mapping']) {
+			id = info['mapping'][iab]
+			id_to_text[id] = iab
+		}
+		
+		//need id to text version of iab
+		for (let visitid in info['classifications']) {
+			mapping_id = info['classifications'][visitid]
+			info['classifications'][visitid] = id_to_text[mapping_id]
+		}
+		
+		return info['classifications']
+		
+	  },
+	  function onFailure(){
+		return false //file doesn't exist
+	  }
+	);
+	
+}
+
+//for the extension main.js to access
+exports.LWCAClassifier = LWCAClassifier 
