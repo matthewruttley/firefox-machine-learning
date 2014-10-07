@@ -1,0 +1,10 @@
+{
+  "author": "Mozilla",
+  "description": "LWCA Testing Package",
+  "fullName": "LWCA",
+  "id": "firefox.lwca@up.mozilla",
+  "license": "MPL 2.0",
+  "name": "firefox-lwca",
+  "version": "0.0.1",
+  "preferences": []
+}
