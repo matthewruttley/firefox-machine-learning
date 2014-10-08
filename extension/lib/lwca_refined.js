@@ -13,7 +13,7 @@
 // >>> ['computers', 0.75]
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = false
+var verbose = true
 
 function LWCAClassifier(){
 	// Main handler class
@@ -288,7 +288,19 @@ function ComponentDatabase(create_objects=true) {
 		if (verbose) console.log("load_meta function called")
 		//load meta
 		let decoder = new TextDecoder();
-		let promise = OS.File.read(OS.Path.join(OS.Constants.Path.profileDir, "meta.json"));
+		
+		/////////DEBUGGING
+		meta_location = OS.Path.join(OS.Constants.Path.profileDir, "meta.json")
+		console.log("Meta should be stored at: " + meta_location)
+		
+		let meta_exists = OS.File.exists(meta_location);
+		meta_exists.then(
+			function(){console.log("Meta file exists")},
+			function(something){ console.log("Meta does not exist, due to: " + something)}
+		);
+		///////////////////
+		
+		let promise = OS.File.read(meta_location);
 		promise = promise.then(
 		  function onSuccess(array) {
 			if (verbose) console.log('onSuccess for meta loading called')
@@ -299,6 +311,7 @@ function ComponentDatabase(create_objects=true) {
 			return true //loads meta information into an object with timestamp and id
 		  },
 		  function onFailure(){
+			if (verbose) console.log("Meta was not found")
 			return false //file doesn't exist
 		  }
 		);
