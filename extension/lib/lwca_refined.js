@@ -305,7 +305,7 @@ function ComponentDatabase(create_objects=true) {
 		  function onSuccess(array) {
 			if (verbose) console.log('onSuccess for meta loading called')
 			let info = decoder.decode(array);
-			data = JSON.parse(info)
+			let data = JSON.parse(info)
 			if (verbose) console.log('meta data found was: ' + JSON.stringify(data))
 			this.meta = data
 			return true //loads meta information into an object with timestamp and id
