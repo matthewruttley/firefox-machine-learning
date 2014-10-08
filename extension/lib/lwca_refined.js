@@ -115,6 +115,7 @@ function ComponentDatabase(create_objects=true) {
 	this.queryVariables = {}
 	this.persistentTitleChunks = {}
 	this.meta = {'timestamp':0}
+	let profile_location = OS.Constants.Path.profileDir + "/" //find the location of the profile directory to save things in
 	
 	this.init = function(){
 		if (verbose) console.log("Began the init function in Cdb")
@@ -288,7 +289,7 @@ function ComponentDatabase(create_objects=true) {
 		if (verbose) console.log("load_meta function called")
 		//load meta
 		let decoder = new TextDecoder();
-		let promise = OS.File.read("meta.json");
+		let promise = OS.File.read(profile_location + "meta.json");
 		promise = promise.then(
 		  function onSuccess(array) {
 			if (verbose) console.log('onSuccess for meta loading called')
@@ -307,7 +308,7 @@ function ComponentDatabase(create_objects=true) {
 	this.load_component_database = function(){
 		//loads the component database if it exists, else returns false
 		let decoder = new TextDecoder();
-		let promise = OS.File.read("cdb.json");
+		let promise = OS.File.read(profile_location+"cdb.json");
 		promise = promise.then(
 		  function onSuccess(array) {
 			let info = decoder.decode(array);
@@ -327,9 +328,6 @@ function ComponentDatabase(create_objects=true) {
 		let encoder = new TextEncoder();
 		let meta_enc = encoder.encode(JSON.stringify(this.meta));
 		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
-		
-		//find the location of the profile directory to save things in
-		let profile_location = OS.Constants.Path.profileDir + "/"
 		
 		//save meta
 		let promise = OS.File.writeAtomic( profile_location + "meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
