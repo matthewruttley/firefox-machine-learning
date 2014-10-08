@@ -115,7 +115,6 @@ function ComponentDatabase(create_objects=true) {
 	this.queryVariables = {}
 	this.persistentTitleChunks = {}
 	this.meta = {'timestamp':0}
-	let profile_location = OS.Constants.Path.profileDir
 	
 	this.init = function(){
 		if (verbose) console.log("Began the init function in Cdb")
@@ -195,7 +194,6 @@ function ComponentDatabase(create_objects=true) {
 		let qv = {} //query variables
 		let ptc = {} //persistent title components
 		let domain_titles = {}
-		let profile_location = OS.Constants.Path.profileDir + "/"
 		
 		history_total = 0
 		for (let visit of history){
@@ -290,7 +288,7 @@ function ComponentDatabase(create_objects=true) {
 		if (verbose) console.log("load_meta function called")
 		//load meta
 		let decoder = new TextDecoder();
-		let promise = OS.File.read(profile_location + "meta.json");
+		let promise = OS.File.read(OS.Path.join(OS.Constants.Path.profileDir, "meta.json"));
 		promise = promise.then(
 		  function onSuccess(array) {
 			if (verbose) console.log('onSuccess for meta loading called')
@@ -309,7 +307,7 @@ function ComponentDatabase(create_objects=true) {
 	this.load_component_database = function(){
 		//loads the component database if it exists, else returns false
 		let decoder = new TextDecoder();
-		let promise = OS.File.read(profile_location + "cdb.json");
+		let promise = OS.File.read(OS.Path.join(OS.Constants.Path.profileDir,"cdb.json"));
 		promise = promise.then(
 		  function onSuccess(array) {
 			let info = decoder.decode(array);
@@ -330,11 +328,9 @@ function ComponentDatabase(create_objects=true) {
 		let meta_enc = encoder.encode(JSON.stringify(this.meta));
 		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
 		//save meta
-		let promise = OS.File.writeAtomic(profile_location + "meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
-		console.log("Wrote meta.json to " + profile_location)
+		let promise = OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "meta.json"),meta_enc,{tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "meta.json.tmp")});
 		//save component database
-		promise = OS.File.writeAtomic(profile_location + "cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
-		console.log("Wrote cdb.json to " + profile_location)
+		promise = OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "cdb.json"),cdb_enc,{tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "cdb.json.tmp")});
 	}
 	
 	if (create_objects==true) {
@@ -973,7 +969,7 @@ function saveClassifications(visit_id_to_iab_lower){
 	
 	let encoder = new TextEncoder();
 	let array = encoder.encode(everything);
-	let promise = OS.File.writeAtomic("classifications.json", array, {tmpPath: "classifications.json.tmp"});
+	let promise = OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "classifications.json"), array, {tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "classifications.json.tmp")});
 	
 }
 
@@ -981,7 +977,7 @@ function loadClassifications(){
 	//returns an id to iab mapping
 		//loads meta information into an object with timestamp and id
 	let decoder = new TextDecoder();
-	let promise = OS.File.read("meta.json");
+	let promise = OS.File.read(OS.Path.join(OS.Constants.Path.profileDir, "meta.json"));
 	promise = promise.then(
 	  function onSuccess(array) {
 		let info = decoder.decode(array);
