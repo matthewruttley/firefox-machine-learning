@@ -15,13 +15,17 @@
 
 console.log("Importing")
 
+const {Cu} = require("chrome");
+Cu.import("resource://gre/modules/Task.jsm");
+
 const {LWCAClassifier} = require("lwca_refined");
 
 console.log("Running")
 
-exports.main = function(options, callbacks){
+exports.main = function(options, callbacks) {Task.spawn(function*() {
   console.log("Debugging LWCA...")
   c = new LWCAClassifier()
+  yield c.init();
   visits = [
 			  ["http://www.ma-shops.com/", "MA Coin stores with 500.000 Coins - Medals - German Coins - Ancient Coins, World Coins Coins Mall"],
 			  ["http://www.trulia.com/", "Real Estate, Homes for Sale, Apartments for Rent, Local data - Trulia"],
@@ -55,4 +59,4 @@ exports.main = function(options, callbacks){
 	console.log("\n\nthe title: " + visit[1])
 	console.log("is classified as: " + c.classify(visit[0], visit[1]))
   }
-}
+});}

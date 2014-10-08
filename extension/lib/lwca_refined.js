@@ -12,6 +12,9 @@
 // > lwca.classify("http://www.bbc.com/some_very_interesting_article", "Apple reveals shiny new gadget")
 // >>> ['computers', 0.75]
 
+const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
+Cu.import("resource://gre/modules/Task.jsm");
+
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
 var verbose = true
 
@@ -87,6 +90,12 @@ function LWCAClassifier(){
 			return scores.sort(sortDescendingBySecondElement)[0]
 		
 	}
+
+	this.init = function() {
+		return Task.spawn(function*() {
+			yield cdb.init();
+		});
+	};
 }
 
 // Pre-processors
@@ -116,9 +125,9 @@ function ComponentDatabase(create_objects=true) {
 	this.persistentTitleChunks = {}
 	this.meta = {'timestamp':0}
 	
-	this.init = function(){
+	this.init = function() {return Task.spawn(function*() {
 		if (verbose) console.log("Began the init function in Cdb")
-		let ts = this.find_start_and_end()
+		let ts = yield this.find_start_and_end();
 		if (ts['start'] == 0) {
 			//nothing ever made before
 			if (verbose) console.log('Nothing found in local directory, so scanning the whole history')
@@ -128,7 +137,7 @@ function ComponentDatabase(create_objects=true) {
 		}else{
 			//something made before, so load it
 			if (verbose) console.log('Found cdb in local directory, importing')
-			this.load_component_database()
+			yield this.load_component_database();
 			
 			
 			//fill in the rest
@@ -161,9 +170,9 @@ function ComponentDatabase(create_objects=true) {
 			if (verbose) console.log('loaded existing cdb from disc')
 		}
 		this.save() //now save everything
-	}
+	}.bind(this));};
 	
-	this.find_start_and_end = function(){
+	this.find_start_and_end = function() {return Task.spawn(function*() {
 		//where to start and end the scanning (if any)
 		
 		//mostly a copy of get_history
@@ -176,7 +185,7 @@ function ComponentDatabase(create_objects=true) {
 		cont.containerOpen = false;
 		
 		
-		lm = this.load_meta() //find last url visited's id
+		lm = yield this.load_meta(); //find last url visited's id
 		if (lm == false) {
 			if (verbose) console.log('Could not find any meta information. Everything needs to be scanned. Please create a component database first')
 			return {'start': 0, 'end': latest_timestamp}
@@ -184,7 +193,7 @@ function ComponentDatabase(create_objects=true) {
 			if (verbose) console.log('Found meta information on disc (ts: ' + this.meta['timestamp'] + ")")
 			return {'start': this.meta['timestamp'], 'end':latest_timestamp} //start and ending timestamps of whatever needs to be updated
 		}
-	}
+	}.bind(this));};
 	
 	this.scan = function(start, end){
 		let history = getHistory()
@@ -284,7 +293,7 @@ function ComponentDatabase(create_objects=true) {
 		return {'persistentTitleChunks':ptc, 'queryVariables':qv}
 	}
 	
-	this.load_meta = function(){
+	this.load_meta = function() {return Task.spawn(function*() {
 		if (verbose) console.log("load_meta function called")
 		//load meta
 		let decoder = new TextDecoder();
@@ -293,62 +302,57 @@ function ComponentDatabase(create_objects=true) {
 		meta_location = OS.Path.join(OS.Constants.Path.profileDir, "meta.json")
 		console.log("Meta should be stored at: " + meta_location)
 		
-		let meta_exists = OS.File.exists(meta_location);
-		meta_exists.then(
-			function(){console.log("Meta file exists")},
-			function(something){ console.log("Meta does not exist, due to: " + something)}
-		);
+		let meta_exists = yield OS.File.exists(meta_location);
+		if (meta_exists) {
+			console.log("Meta file exists");
+		}
+		else {
+			console.log("Meta does not exist");
+			return false;
+		}
 		///////////////////
 		
-		let promise = OS.File.read(meta_location);
-		promise = promise.then(
-		  function onSuccess(array) {
+		try {
+			let array = yield OS.File.read(meta_location);
 			if (verbose) console.log('onSuccess for meta loading called')
 			let info = decoder.decode(array);
 			let data = JSON.parse(info)
 			if (verbose) console.log('meta data found was: ' + JSON.stringify(data))
 			this.meta = data
 			return true //loads meta information into an object with timestamp and id
-		  },
-		  function onFailure(){
+		}
+		catch(ex) {
 			if (verbose) console.log("Meta was not found")
 			return false //file doesn't exist
-		  }
-		);
-	}
+		}
+	}.bind(this));};
 	
-	this.load_component_database = function(){
+	this.load_component_database = function() {return Task.spawn(function*() {
 		//loads the component database if it exists, else returns false
 		let decoder = new TextDecoder();
-		let promise = OS.File.read(OS.Path.join(OS.Constants.Path.profileDir,"cdb.json"));
-		promise = promise.then(
-		  function onSuccess(array) {
+		try {
+			let array = yield OS.File.read(OS.Path.join(OS.Constants.Path.profileDir,"cdb.json"));
 			let info = decoder.decode(array);
 			info = JSON.parse(info)
 			this.queryVariables = info['queryVariables']
 			this.persistentTitleChunks = info['persistentTitleChunks']
 			return true
-		  },
-		  function onFailure(){
+		}
+		catch(ex) {
 			return false //file doesn't exist
-		  }
-		);
-	}
+		}
+	}.bind(this));};
 	
-	this.save = function(){
+	this.save = function() {return Task.spawn(function*() {
 		//assumes that both cdb and meta have been created
 		let encoder = new TextEncoder();
 		let meta_enc = encoder.encode(JSON.stringify(this.meta));
 		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
 		//save meta
-		let promise = OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "meta.json"),meta_enc,{tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "meta.json.tmp")});
+		yield OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "meta.json"),meta_enc,{tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "meta.json.tmp")});
 		//save component database
-		promise = OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "cdb.json"),cdb_enc,{tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "cdb.json.tmp")});
-	}
-	
-	if (create_objects==true) {
-		this.init() //called when created. Can set the arg to false if you just want to access random functions
-	}
+		yield OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, "cdb.json"),cdb_enc,{tmpPath: OS.Path.join(OS.Constants.Path.profileDir, "cdb.json.tmp")});
+	}.bind(this));};
 }
 
 function removePersistentTitleChunks(url, title, cdb){
@@ -809,7 +813,6 @@ function convertWikiToIAB(results, level="top") {
 
 // Auxiliary functions, matchers, options etc
 
-const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 const {data} = require("sdk/self"); //not quite sure why this is necessary
 let {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
 let historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
