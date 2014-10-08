@@ -330,7 +330,7 @@ function ComponentDatabase(create_objects=true) {
 		//save meta
 		let promise = OS.File.writeAtomic("meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
 		//save component database
-		let promise = OS.File.writeAtomic("cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
+		promise = OS.File.writeAtomic("cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
 	}
 	
 	if (create_objects==true) {
