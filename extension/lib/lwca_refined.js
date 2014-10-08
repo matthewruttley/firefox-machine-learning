@@ -115,6 +115,7 @@ function ComponentDatabase(create_objects=true) {
 	this.queryVariables = {}
 	this.persistentTitleChunks = {}
 	this.meta = {'timestamp':0}
+	let profile_location = OS.Constants.Path.profileDir
 	
 	this.init = function(){
 		if (verbose) console.log("Began the init function in Cdb")
@@ -330,8 +331,10 @@ function ComponentDatabase(create_objects=true) {
 		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
 		//save meta
 		let promise = OS.File.writeAtomic(profile_location + "meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
+		console.log("Wrote meta.json to " + profile_location)
 		//save component database
 		promise = OS.File.writeAtomic(profile_location + "cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
+		console.log("Wrote cdb.json to " + profile_location)
 	}
 	
 	if (create_objects==true) {
