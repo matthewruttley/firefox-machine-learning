@@ -194,6 +194,7 @@ function ComponentDatabase(create_objects=true) {
 		let qv = {} //query variables
 		let ptc = {} //persistent title components
 		let domain_titles = {}
+		let profile_location = OS.Constants.Path.profileDir + "/"
 		
 		history_total = 0
 		for (let visit of history){
@@ -288,7 +289,7 @@ function ComponentDatabase(create_objects=true) {
 		if (verbose) console.log("load_meta function called")
 		//load meta
 		let decoder = new TextDecoder();
-		let promise = OS.File.read("meta.json");
+		let promise = OS.File.read(profile_location + "meta.json");
 		promise = promise.then(
 		  function onSuccess(array) {
 			if (verbose) console.log('onSuccess for meta loading called')
@@ -307,7 +308,7 @@ function ComponentDatabase(create_objects=true) {
 	this.load_component_database = function(){
 		//loads the component database if it exists, else returns false
 		let decoder = new TextDecoder();
-		let promise = OS.File.read("cdb.json");
+		let promise = OS.File.read(profile_location + "cdb.json");
 		promise = promise.then(
 		  function onSuccess(array) {
 			let info = decoder.decode(array);
@@ -328,9 +329,9 @@ function ComponentDatabase(create_objects=true) {
 		let meta_enc = encoder.encode(JSON.stringify(this.meta));
 		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
 		//save meta
-		let promise = OS.File.writeAtomic("meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
+		let promise = OS.File.writeAtomic(profile_location + "meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
 		//save component database
-		promise = OS.File.writeAtomic("cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
+		promise = OS.File.writeAtomic(profile_location + "cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
 	}
 	
 	if (create_objects==true) {
