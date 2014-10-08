@@ -327,10 +327,14 @@ function ComponentDatabase(create_objects=true) {
 		let encoder = new TextEncoder();
 		let meta_enc = encoder.encode(JSON.stringify(this.meta));
 		let cdb_enc = encoder.encode(JSON.stringify({'queryVariables':this.queryVariables, 'persistentTitleChunks':this.persistentTitleChunks}));
+		
+		//find the location of the profile directory to save things in
+		let profile_location = OS.Constants.Path.profileDir + "/"
+		
 		//save meta
-		let promise = OS.File.writeAtomic("meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
+		let promise = OS.File.writeAtomic( profile_location + "meta.json", meta_enc, {tmpPath: "meta.json.tmp"});
 		//save component database
-		let promise = OS.File.writeAtomic("cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
+		promise = OS.File.writeAtomic( profile_location + "cdb.json", cdb_enc, {tmpPath: "cdb.json.tmp"});
 	}
 	
 	if (create_objects==true) {
