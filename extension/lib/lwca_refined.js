@@ -374,10 +374,13 @@ function removePersistentTitleChunks(url, title, cdb){
 
 function removeDomainNames(url, title) {
 	//tries to remove the domain name (or aspects of it) from the title
+	//if this reduces the title to nothing, then just leave them in
 	url = parseUri(url)
 	url = url.host.split(".")
 	title = title.toLowerCase().match(wordFinder)
+	
 	new_title = []
+	removed = []
 	
 	for (let token of title) {
 		if (url.indexOf(token)==-1) {
@@ -385,7 +388,11 @@ function removeDomainNames(url, title) {
 		}
 	}
 	
-	return new_title.join(" ")
+	if (new_title.length == 0) {
+		return title.join(" ") 
+	}else{
+		return new_title.join(" ")
+	}	
 }
 
 // Classification
