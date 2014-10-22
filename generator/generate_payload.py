@@ -11,6 +11,7 @@ from json import load, dumps, dump
 from os import listdir
 from pdb import set_trace
 from re import findall, match
+from math import sqrt
 
 geo = {
 	'countries': [	'the_bahamas', "the_gambia", 'bosnia_and_herzegovina', 'the_central_african_republic', 'the_czech_republic', 'the_dominican_republic', 'the_republic_of_ireland', 'north_korea', 'south_korea',
@@ -57,12 +58,14 @@ partial_matchers = {
 		'plants_with': 'botany',
 		'jesus': 'christianity',
 		'planetary': 'astronomy',
+		'bdsm': 'sexuality',
+		
 	},
 	'enders': {
 		'agriculture': set(['agriculture']),
 		'air travel': set(['aircraft']),
 		'animals': set(['fish', u'sphodromantis', u'strepsiptera', u'thrips', u'megaloptera', 'lice', 'flies', u'tarachodes', u'rivetina', u'phasmatodea', u'miomantis', u'mirosternus', u'psocoptera', 'earwigs', u'plecoptera', u'oxyothespis', u'adephaga', u'polyphaga', 'cockroaches', 'beetles', u'eremiaphila', u'rhombodera', 'termites', u'cimicomorpha', u'acromantis', u'amantis', u'xyletobius', 'fleas', 'mayflies']),
-		'anthropology': set(['peoples']),
+		'anthropology': set(['peoples', 'tribe', 'clan']),
 		'architecture': set(['architects']),
 		'automotive': set(['vehicles']),
 		'astronomy': set(['planets']),
@@ -96,7 +99,7 @@ partial_matchers = {
 		'soccer': set(['footballers', 'f.c.', 'a.f.c.']),
 		'television': set(['television_series']),
 		'trains': set(['railroads', 'locomotives']),
-		'university': set(['university']),
+		'university': set(['university', 'universities']),
 		'usa': set(['massachusetts', 'connecticut']),
 	},
 	'all_children': {
@@ -394,171 +397,48 @@ def resolve_mistakes(category_mapping):
 	
 	TODO:
 	- Look into unclassified category for coverage metric
-	- make sure things like university actually exist
-	
-	how do these exist
-	mistakes = {
-		u'delparent': '',
-		u'del': '',
-		u'del_parent': '',
-	}
-	
-	#weather category - local news???
 	
 	"""
 	
-	#change hotel to hotels for all
-	
-	#first load mozcat
+	#first load the heirarchy into memory
 	with open('mozcat_heirarchy.json') as f:
 		tree = load(f)
+		
+		all_cats = set() #change tree's lists to sets since these avoid dupes
+		for top,subs in tree.iteritems():
+			all_cats.update([top])
+			all_cats.update(subs)
+		
+		for top_level in tree.iterkeys():
+			tree[top_level] = set(tree[top_level])
 	
-	#make flat list
-	all_cats = set()
-	for k,v in tree.iteritems():
-		all_cats.update([k])
-		all_cats.update(v)
+	#remove things from the taxonomy that we know aren't used
+	sub_cat_remove = set([u'cell phones', u'hotel', u'graduate school', u'local news', u'windows ', u'north_korea', u'greenland', u'sri_lanka', 'greenland'])
+	top_level_remove = set([])
 	
+	for x in top_level_remove:
+		if x in all_cats:
+			all_cats.remove(x)
+		if x in tree:
+			del tree[x]
+	
+	for x in sub_cat_remove:
+		if x in all_cats:
+			all_cats.remove(x)
+		for k,v in tree.iteritems():
+			if x in v:
+				tree[k].remove(x)
+	
+	#now clean up some of the mappings that contain extra whitespace, upper case, underscores etc
 	cleaned = {}
-	#clean up mappings
 	for k,v in category_mapping.iteritems():
-		v = v.strip() #remove whitespace
-		v = v.lower() #lower case
-		v = v.replace("_", " ") #replace underscores
+		v = v.replace("_", " ").strip().lower()
 		cleaned[k] = v #insert
 	category_mapping = cleaned
 	cleaned = 0 #free up memory
 	
-	nest = {
-		u'golf': 'nest_sports','hockey': 'nest_sports',u'tennis': 'nest_sports','cricket': 'nest_sports',
-		u'rugby': 'nest_sports',u'volleyball': 'nest_sports',
-		
-		'university': 'nest_education',
-		'writing': 'nest_hobbies & interests',
-		u'cardiac arrest': 'nest_health & fitness',
-		u'windows ': 'nest_technology & computing',
-		'theatre': 'nest_arts & entertainment',
-		u'journalism': 'nest_news',
-		
-		'kosovo': 'nest_travel','north_korea': 'nest_travel','senegal': 'nest_travel','gabon': 'nest_travel','guinea': 'nest_travel','barbados': 'nest_travel','bhutan': 'nest_travel','micronesia': 'nest_travel','kuwait': 'nest_travel','belarus': 'nest_travel','liberia': 'nest_travel','latvia': 'nest_travel',
-		'kyrgyzstan': 'nest_travel', 'haiti': 'nest_travel','zambia': 'nest_travel','lebanon': 'nest_travel','luxembourg': 'nest_travel',u'greenland': 'nest_travel','honduras': 'nest_travel','palau': 'nest_travel','mozambique': 'nest_travel',
-		'armenia': 'nest_travel','kiribati': 'nest_travel','belize': 'nest_travel','tunisia': 'nest_travel','oman': 'nest_travel',u'colombia': 'nest_travel',
-		'niger': 'nest_travel','fiji': 'nest_travel','comoros': 'nest_travel','slovenia': 'nest_travel','dominica': 'nest_travel','turkmenistan': 'nest_travel',
-		'slovakia': 'nest_travel','suriname': 'nest_travel',u'bolivia': 'nest_travel','malawi': 'nest_travel','ecuador': 'nest_travel',
-		'algeria': 'nest_travel','montenegro': 'nest_travel','togo': 'nest_travel','cambodia': 'nest_travel','ethiopia': 'nest_travel','argentina': 'nest_travel',
-		u'yemen': 'nest_travel','portugal': 'nest_travel','lesotho': 'nest_travel','uganda': 'nest_travel','burundi': 'nest_travel',
-		u'turkey': 'nest_travel','madagascar': 'nest_travel','antigua': 'nest_travel','mali': 'nest_travel', 'vanuatu': 'nest_travel',
-		'trains': 'nest_travel','sri_lanka': 'nest_travel',u'columbia': 'nest_travel','chad': 'nest_travel','mauritius': 'nest_travel',
-		'botswana': 'nest_travel',
-		'theme parks': 'nest_travel'}
-
-	for k,v in nest.iteritems():
-		under_what = v[5:]
-		if under_what not in all_cats:
-			print "Mistake: {0} doesn't exist in all_cats".format(v)
-		else:
-			category_mapping[k] = k #create
-			tree[under_what].append(k) #nest
-			all_cats.update([k])
 	
-	change_then_nest_under_travel = {
-		'the_maldives': 'maldives',
-		'the_czech_republic': 'czech republic',
-		'the_dominican_republic': 'dominican republic',
-		'sierra_leone': 'sierra leone',
-		'saint_kitts_and_nevis': 'saint kitts and nevis',
-		'the_bahamas': 'the bahamas',
-		'the_united_arab_emirates': 'united arab emirates',
-		'saint_lucia': 'saint lucia',
-		'burkina': 'burkina faso',
-		'the_united_kingdom': 'united kingdom',
-		'cape_verde': 'cape verde',
-		'east_timor': 'east timor',
-		u'Bosnia and Herzegovina': 'bosnia and herzegovina',
-		'trinidad_and_tobago': 'trinidad and tobago',
-		'the_marshall_islands': 'the marshall islands',
-		'el_salvador': 'el salvador',
-		'the_gambia': 'the gambia',
-		'the_central_african_republic': 'central african republic',
-	}
-	
-	for k,v in change_then_nest_under_travel.iteritems():
-		to_change = [x for x in category_mapping if category_mapping[x] == k]
-		#correct them
-		for x in to_change:
-			category_mapping[x] = v
-		
-		#if v doesn't exist, create it
-		if v not in all_cats:
-			tree['travel'].append(v) #and nest it under travel
-	
-	redirects = {
-		#redirects (typically mistakes or abbreviations)
-		'luxury car': 'automotive_luxury cars',
-		u'children': 'education_parenting children',
-		u'linguistics': 'education_languages',
-		u'wales': 'travel_united kingdom',
-		u'universitiy': 'education_university',
-		'trucks': 'automotive_pickup trucks',
-		'toddlers': 'education_parenting children',
-		u'radio ': 'arts & entertainment_radio',
-		u'psychology': 'health & fitness_psychology & psychiatry',
-		'south_korea': 'travel_korea',
-		'burma': 'travel_myanmar',
-		u'chemical_mixtures': 'science_chemistry',
-		u'video': 'technology & computing_desktop video',
-		u'boats': 'sports_sailing',
-		'the_united_states': 'travel_usa',
-		u'greenland': 'travel_greenland',
-		u'greeland': 'travel_greenland',
-		'the_republic_of_ireland': 'travel_ireland',
-		u'phyics': 'science_physics',
-		u'operas': 'arts & entertainment_opera',
-		u'train': 'travel_trains',
-		u'food & drinks': 'food & drink',
-		'programming': 'technology & computing_computer programming',
-		u'sports ': 'sports',
-		'piano': 'music',
-	}
-	
-	for k,v in redirects.iteritems():
-		#split up v
-		v = v.split('_')
-		if len(v) == 1:
-			#v is top level
-			#might need to make it
-			if v[0] not in all_cats:
-				all_cats.update([v[0]])
-				tree[v[0]] = []
-			
-			for x in category_mapping.iterkeys():
-				if category_mapping[x] == k:
-					category_mapping[x] = v[0]
-		else:
-			#v is in two parts
-			top_level = v[0]
-			sub_cat = v[1]
-			
-			#make sure top level exists
-			if top_level not in all_cats:
-				all_cats.update([top_level])
-				tree[top_level] = []
-			
-			#make sure sub cat exists
-			if sub_cat not in all_cats:
-				all_cats.update([sub_cat])
-				tree[top_level].append(sub_cat)
-			
-			#nest it
-			for x in category_mapping.iterkeys():
-				if category_mapping[x] == k:
-					category_mapping[x] = v[1]
-	
-	#add some extra categories (this module needs reorganization)
-	#to_add = ['business_energy']
-	tree['business'].append('energy')
-	all_cats.update(['energy'])
-	
+	#these are basic corrections:
 	corrections = {
 		'shipping_companies': 'business',
 		'pharmaceutical_companies': 'business', 'dental_companies': 'dental care', 'ontario_hydro': 'energy', 'performance_management': 'business', 'translation_companies': 'languages', 'imperial_tobacco': 'smoking',
@@ -580,7 +460,7 @@ def resolve_mistakes(category_mapping):
 		'msn': 'internet', 'georgia_power': 'energy', 'enron': 'crime', 'accountancy': 'business', 'mining': 'business', 'taxicab_companies': 'travel', 'meteorological_companies': 'geography',
 		'poker_companies': 'gambling', 'employee-owned_companies': 'business', 'nikon': 'photography', 'pasta_companies': 'italian cuisine', 'norsk_hydro': 'energy', 'petrobras': 'energy',
 		'commerce': 'commerce', 'cartels': 'business', 'ibm': 'technology & computing', 'texas_instruments': 'science', 'red_hat': 'unix', 'engineering_companies': 'business', 'collegehumor': 'humor',
-		'saskpower': 'energy', 'slave_trade': 'history', 'hospitality_companies': 'hotel', 'agent-owned_companies': 'del', 'food_companies': 'business', 'photography_companies': 'photography',
+		'saskpower': 'energy', 'slave_trade': 'history', 'hospitality_companies': 'hotels', 'agent-owned_companies': 'del', 'food_companies': 'business', 'photography_companies': 'photography',
 		'business_analysis': 'business', 'lukoil': 'energy', 'podcasting_companies': 'radio', 'motherboard_companies': 'computer hardware', 'non-profit_corporations': 'business',
 		'agriculture_companies': 'agriculture', 'investment_companies': 'investing', 'snowboarding_companies': 'snowboarding', 'chemical_companies': 'business', 'railway_companies': 'trains',
 		'chartered_companies': 'business', 'e.on': 'energy', 'corporations': 'del', 'fertilizer_companies': 'agriculture', 'moving_companies': 'interior design', 'lenovo': 'computer hardware',
@@ -682,38 +562,345 @@ def resolve_mistakes(category_mapping):
 		u'seram_island': 'indonesia',
 		u'urban_forestry': 'forestry',
 		'destroyed_landmarks': 'del',
+		u'postcard publishers': 'del',
+		u'sloan_fellowship': 'del',
+		u'english_drama': 'del',
+		u'english_poetry': 'del',
+		u'natural_units': 'del',
+		u'measurement': 'del',
+		u'mcclatchy_publications': 'del',
+		u'error': 'del',
+		u'dimensional_analysis': 'del',
+		u'metrology': 'del',
+		u'midlatitude_weather': 'weather',
+		u'meteorological_stations': 'weather',
+		u'itv_weather': 'weather',
+		u'weather': 'weather',
+		u'anomalous_weather': 'weather',
+		'meteorology': 'weather',
+		u'pathological_science': 'del',
+		u'mud\xe9jar_architecture': 'architecture',
+		u'ch\xe2teauesque_architecture': 'architecture',
+		u'revues': 'del',
+		u'norse-gaels': 'del',
+		u'transliteration': 'del',
+		u'man-eaters': 'del',
+		u'ptolemaic_court': 'del',
+		u'motorcycle_racing': 'motorcycles',
+		u'rally_racing': 'motorcycles',
+		u'pigeon_racing': 'del',
+		u'skeleton_racing': 'del',
+		u'boat_racing': 'sailing',
+		u'motorboat_racing': 'sailing',
+		u'cycle_racing': 'cycling',
+		u'greyhound_racing': 'dogs',
+		u'air_racing': 'del',
+		u'knowledge_engineering': 'del',
+		u'hellenistic_engineering': 'del',
+		u'fire_protection': 'del',
+		u'coastal_engineering': 'del',
+		u'home_automation': 'home appliances',
+		u'building_engineering': 'construction',
+		u'petroleum_engineering': 'energy',
+		u'aerospace_engineering': 'military',
+		u'aerospace_materials': 'military',
+		u'mechanical_engineering': 'mechanics',
+		u'transport_engineering': 'del',
+		u'cost_engineering': 'del',
+		u'software_engineering': 'computer programming',
+		u'automotive_engineering': 'auto parts',
+		u'civil_engineering': 'mechanics',
+		u'power_engineering': 'del',
+		u'diving_engineering': 'del',
+		u'mining_engineering': 'mining',
+		u'pavement_engineering': 'del',
+		u'dbs_bank': 'investing',
+		u'method_engineering': 'del',
+		u'offshore_engineering': 'del',
+		u'neural_engineering': 'del',
+		u'superhero_fiction': 'comics',
+		u'polish\u2013soviet_war': 'military',
+		u'car_windows': 'auto parts',
+		u'a\xe9rospatiale_aircraft': 'air travel',
+		u'russia\u2013georgia_war': 'military',
+		u'windows_xp': 'windows',
+		u'microsoft_windows': 'windows',
+		u'gothic_fiction': 'literature',
+		u'yuma_war': 'military',
+		u'm\u0101ori_history': 'new zealand',
+		u'robotics_events': 'physics',
+		u'medical_robotics': 'biotech',
+		u'industrial_robotics': 'physics',
+		u'oda_clan': 'japan',
+		u'archie_comics': 'comics',
+		u'maeda_clan': 'japan',
+		u'ethnic_humor': 'humor',
+		u'computer_humor': 'humor',
+		u'surface_mining': 'mining',
+		u'uranium_mining': 'mining',
+		u'tin_mining': 'mining',
+		u'web_humor': 'internet culture',
+		u'underground_mining': 'mining',
+		u'coal_mining': 'mining',
+		u'professional_humor': 'humor',
+		u'm\u0101ori_music': 'music',
+		u'd\u014djin_music': 'music',
+		u'copper_mining': 'mining',
+		u'lead_mining': 'mining',
+		u'silver_mining': 'mining',
+		u'book_collecting': 'literature',
+		'postcard_publishers': 'del'
 	}
 	
-	#hope this will work in-place without any dictionary size change errors
-	seen = set()
-	for k,v in category_mapping.iteritems():
-		if k in corrections:
-			#make sure the new subcat exists
-			if corrections[k] not in all_cats:
-				if corrections[k] not in seen:				
-					print "Correction not seen: {0}".format(corrections[k])
-					seen.update([corrections[k]])
-			else:
-				category_mapping[k] = corrections[k]
+	for wiki, iab in corrections.iteritems():
+		category_mapping[wiki] = iab
+	
+	#these are completely new sub categories to add to the ontology
+	#they need to be nested under existing top level categories
+	new_sub_categories = {
+		u'golf': 'nest_sports','hockey': 'nest_sports',u'tennis': 'nest_sports','cricket': 'nest_sports',
+		u'rugby': 'nest_sports',u'volleyball': 'nest_sports', u'skating': 'nest_sports', u'darts': 'nest_sports',
+		
+		'university': 'nest_education',
+		'writing': 'nest_hobbies & interests',u'scouting': 'nest_hobbies & interests',
+		u'stamps': 'nest_hobbies & interests',
+		u'cardiac arrest': 'nest_health & fitness',u'smoking cessation': 'nest_health & fitness',
+		u'windows': 'nest_technology & computing',
+		'theatre': 'nest_arts & entertainment',
+		u'journalism': 'nest_news',
+		'weather': 'nest_news',
+		u'fencing': 'nest_sports',
+		u'sociology': 'nest_society',
+		u'design': 'nest_arts & entertainment',
+		u'chinese cuisine': 'nest_food & drink',
+		u'weather': 'nest_news',
+		u'rowing': 'nest_sports',
+		'hotels': 'nest_travel',
+		u'mining': 'nest_business', u'shipping': 'nest_business',
+		u'cats': 'nest_pets',
+		'energy': 'nest_business',
+		'cellphones': 'nest_technology & computing',
+		'motorcycles': 'nest_automotive',
+		
+		'kosovo': 'nest_travel','north korea': 'nest_travel','senegal': 'nest_travel','gabon': 'nest_travel','guinea': 'nest_travel','barbados': 'nest_travel','bhutan': 'nest_travel','micronesia': 'nest_travel','kuwait': 'nest_travel','belarus': 'nest_travel','liberia': 'nest_travel','latvia': 'nest_travel',
+		'kyrgyzstan': 'nest_travel', 'haiti': 'nest_travel','zambia': 'nest_travel','lebanon': 'nest_travel','luxembourg': 'nest_travel',u'greenland': 'nest_travel','honduras': 'nest_travel','palau': 'nest_travel','mozambique': 'nest_travel',
+		'armenia': 'nest_travel','kiribati': 'nest_travel','belize': 'nest_travel','tunisia': 'nest_travel','oman': 'nest_travel',u'colombia': 'nest_travel',
+		'niger': 'nest_travel','fiji': 'nest_travel','comoros': 'nest_travel','slovenia': 'nest_travel','dominica': 'nest_travel','turkmenistan': 'nest_travel',
+		'slovakia': 'nest_travel','suriname': 'nest_travel',u'bolivia': 'nest_travel','malawi': 'nest_travel','ecuador': 'nest_travel',
+		'algeria': 'nest_travel','montenegro': 'nest_travel','togo': 'nest_travel','cambodia': 'nest_travel','ethiopia': 'nest_travel','argentina': 'nest_travel',
+		u'yemen': 'nest_travel','portugal': 'nest_travel','lesotho': 'nest_travel','uganda': 'nest_travel','burundi': 'nest_travel',
+		u'turkey': 'nest_travel','madagascar': 'nest_travel','antigua': 'nest_travel','mali': 'nest_travel', 'vanuatu': 'nest_travel',
+		'trains': 'nest_travel','sri lanka': 'nest_travel',u'columbia': 'nest_travel','chad': 'nest_travel','mauritius': 'nest_travel',u'moldova': 'nest_travel',
+		'botswana': 'nest_travel', 'congo': 'nest_travel',
+		'theme parks': 'nest_travel'}
+	
+	for new_cat, under_what in new_sub_categories.iteritems():
+		top_level = under_what[5:]
+		if top_level not in all_cats:
+			print "Nesting Stage: Mistake: {0} is a top level that doesn't exist in all_cats".format(top_level)
+		else:
+			tree[top_level].update([new_cat]) #nest
+			all_cats.update([new_cat])
+	
+	#these are spelling mistakes that have been made in category names, not errors in the categorization themselves
+	category_corrections = {
+		'south korea': 'travel_south korea',
+		'the_maldives': 'travel_maldives',
+		'the central african republic': 'travel_central african republic',
+		'the_czech_republic': 'travel_czech republic',
+		'the_dominican_republic': 'travel_dominican republic',
+		'sierra_leone': 'travel_sierra leone',
+		'saint_kitts_and_nevis': 'travel_saint kitts and nevis',
+		'the_bahamas': 'travel_the bahamas',
+		'the_united_arab_emirates': 'travel_united arab emirates',
+		'saint_lucia': 'travel_saint lucia',
+		'burkina': 'travel_burkina faso',
+		'the_united_kingdom': 'travel_united kingdom',
+		'cape_verde': 'travel_cape verde',
+		'east_timor': 'travel_east timor',
+		u'Bosnia and Herzegovina': 'travel_bosnia and herzegovina',
+		'trinidad_and_tobago': 'travel_trinidad and tobago',
+		'the_marshall_islands': 'travel_the marshall islands',
+		'el_salvador': 'travel_el salvador',
+		'the_gambia': 'travel_the gambia',
+		'the_central_african_republic': 'travel_central african republic',
+		u'the republic of ireland': 'travel_ireland',
+		u'the united arab emirates': 'travel_united arab emirates',
+		'the czech republic': 'travel_czech republic',
+		'the dominican republic': 'travel_dominican republic',
+		'the philippines': 'travel_philippines',
+		'the united states': 'travel_usa',
+		'the maldives': 'travel_maldives',
+		'the united kingdom': 'travel_united kingdom',
+		u'ships': 'business_shipping',
+		u'art history': 'arts & entertainment_fine art',
+		u'aimals': 'biology_animals',
+		u'telecommunication': 'cell phones',
+		'hotel': 'travel_hotels',
+		u'cooking techniques': 'food & drink_cooking',
+		u'buddhist': 'religion_buddhism',
+		u'metal': 'hobbies & interests_metalworking',
+		u'potter': 'hobbies & interests_pottery',
+		u'sleep disorders': 'health & fitness_sleeping disorders',
+		'chemical mixtures': 'science_chemistry',
+		'luxury car': 'automotive_luxury cars',
+		u'children': 'education_parenting children',
+		u'linguistics': 'education_languages',
+		u'wales': 'travel_united kingdom',
+		u'universitiy': 'education_university',
+		'trucks': 'automotive_pickup trucks',
+		'toddlers': 'education_parenting children',
+		u'radio ': 'arts & entertainment_radio',
+		u'psychology': 'health & fitness_psychology & psychiatry',
+		'south_korea': 'travel_south korea',
+		'burma': 'travel_myanmar',
+		u'chemical_mixtures': 'science_chemistry',
+		u'video': 'technology & computing_desktop video',
+		u'boats': 'sports_sailing',
+		'the_united_states': 'travel_usa',
+		u'greenland': 'travel_greenland',
+		u'greeland': 'travel_greenland',
+		'the_republic_of_ireland': 'travel_ireland',
+		u'phyics': 'science_physics',
+		u'operas': 'arts & entertainment_opera',
+		u'train': 'travel_trains',
+		u'food & drinks': 'food & drink',
+		'programming': 'technology & computing_computer programming',
+		u'sports ': 'sports',
+		'piano': 'music',
+		u'instruments': 'arts & entertainment_music',
+		u'educatoin': 'education',
+		u'surding': 'sports_surfing',
+		u'anime': 'arts & entertainment_animation',
+		u'theater': 'arts & entertainment_theatre',
+		u'miltary': 'military',
+		u'ballet': 'arts & entertainment_dance',
+		u'dancing': 'arts & entertainment_dance',
+		u'journalims': 'news_journalism',
+		u'anthrpology': 'society_anthropology',
+		u'lanaguages': 'education_languages',
+		u'chemistr': 'science_chemistry',
+		u'sport': 'sports',
+		u'bird watching': 'hobbies & interests_birdwatching',
+		u'foklore': 'folklore',
+		u'litea': 'arts & entertainment_literature',
+		u'motorcycling': 'automotive_motorcycles',
+		'motorcycling': 'automotive_motorcycles',
+		u'fashio': 'fashion',
+		u'cell phones': u'technology & computing_cellphones',
+		u'family': 'family & parenting',
+	}
+	
+	for old,new in category_corrections.iteritems():
+		#split up v
+		new = new.split('_')
+		if len(new) == 1: #process top level items with no subcat
+			new = v[0]
+			if new not in all_cats:
+				all_cats.update([new])
+				tree[new] = set([])
+			
+			for wiki in category_mapping.iterkeys():
+				if category_mapping[wiki] == old:
+					category_mapping[wiki] = new
+		else:
+			#v is in two parts
+			top_level = v[0]
+			sub_cat = v[1]
+			
+			#make sure top level exists
+			if top_level not in all_cats:
+				all_cats.update([top_level])
+				tree[top_level] = set([])
+			
+			#make sure sub cat exists
+			if sub_cat not in all_cats:
+				all_cats.update([sub_cat])
+				tree[top_level].update([sub_cat])
+			
+			#nest it
+			for wiki in category_mapping.iterkeys():
+				if category_mapping[wiki] == old:
+					category_mapping[wiki] = sub_cat
+	
 	
 	#now check for del or del(_)parent
 	to_delete = set()
-	delparent = set()
+	del_matchers = set([u'de', u'dell',  u'de;', u'dek', 'del', 'del_parent', 'delparent', 'del parent'])
 	for k,v in category_mapping.iteritems():
-		if v == 'del':
+		if v in del_matchers:
 			to_delete.update([k])
-		if (v == 'del_parent') or (v == 'delparent'):
-			delparent.update([k])
 	
 	for x in to_delete:
 		del category_mapping[x]
 	
-	print "delparent:"
-	print [x for x in delparent if x not in partial_matchers['delparent']]
+	#check that there's nothing that's never been seen
+	print "Unknown: " + unicode(set([v for k,v in category_mapping.iteritems() if v not in all_cats]))
+	
+	for k in tree.iterkeys(): #change sets to lists
+		tree[k] = list(tree[k])
+	
+	used_cats = set(category_mapping.values())
+	print "Un-used cats: {0}".format([x for x in all_cats if x not in used_cats])
+	
+	
+	#consider removing travel category
 	
 	return category_mapping, tree
 
 #optimal processing
+
+def describe(ckm, cam, category_mapping, what):
+	"""Describes a category"""
+	print "{0} exist in category mapping, has value <{1}>".format(what, category_mapping[what]) if what in category_mapping else "{0} not in category mapping"
+	print "{0} not in CKM".format(what) if what not in ckm else "{0} has {1} keywords in CKM:\n{2}".format(what, len(ckm[what]), ckm[what])
+	print "{0} not in CAM".format(what) if what not in cam else "{0} has {1} child articles:\nIn CM: {2}\nDeleted: {3}".format(what, len(cam[what]), [x for x in cam[what] if (x in category_mapping) and (category_mapping[x] != '')], [x for x in cam[what] if x not in category_mapping])
+	print "{0} is a child of parents: {1}".format(what, [x for x in cam if what in cam[x]])
+
+def find_most_popular_words_for_each_IAB(category_mapping, ckm):
+	"""Finds popular words for each category, suggests others containing them"""
+	
+	with open('mozcat_heirarchy.json') as f:
+		tree = load(f)
+		all_cats = [x for x in chain(*tree.values())] + tree.keys()
+	
+	#sort them v -> k
+	buckets = defaultdict(list)
+	kw_dists = defaultdict(lambda: defaultdict(int)) #kw counts per bucket
+	for k,v in category_mapping.iteritems():
+		if k in ckm:
+			if v != "":
+				buckets[v].append(k)
+				for w,x in ckm[k].iteritems():
+					kw_dists[v][w] += x #or just raw freq?
+	
+	#sort descending
+	for k,v in kw_dists.iteritems():
+		kw_dists[k] = set([x[0] for x in sorted(v.items(), key=lambda x: x[1], reverse=True)[:5]])
+	
+	#now find some more things
+	sim = defaultdict(list) #say search top 5 kws?
+	for k,v in category_mapping.iteritems():
+		if v == "":
+			if k in ckm:
+				words = set(ckm[k])
+				for category, kws in kw_dists.iteritems():
+					islen = len(words.intersection(kws))
+					if islen > 1:
+						sim[category].append([k, islen])
+	
+	#now sort to get top matches
+	#and save
+	fn = 'cx_popular_words_similar_cats_1.txt'
+	with copen(fn, 'w', encoding='utf8') as f:
+		count = 0
+		for k,v in sim.iteritems():
+			relevant = sorted(v, key=lambda x:x[1], reverse=True)
+			for x in relevant[:25]:
+				f.write(u'{0}\t\t{1}?\n'.format(x[0], k))
+				count += 1
+	
+	print "wrote {0} to {1}".format(count, fn)
 
 def find_categories_with_most_words(ckm, category_mapping):
 	"""Sorted descending"""
@@ -722,7 +909,10 @@ def find_categories_with_most_words(ckm, category_mapping):
 	a = [[x, len(ckm[x])] for x in a]
 	a = sorted(a, key=lambda x: x[1], reverse=True)
 	print "Returning 1000 of {0}".format(len(a))
-	return a[:1000]
+	a = a[:1000]
+	with copen('cx_everything_11.txt', 'w', encoding='utf8') as f:
+		for x in a:
+			f.write(u'{0}\t\t{1}\n'.format(x[0], x[1]))
 
 def find_categories_with_the_most_individual_words(category_mapping, ckm):
 	"""Sorted descending"""
@@ -762,35 +952,66 @@ def find_categories_with_near_unique_words(category_mapping, ckm):
 	return scores
 
 def find_deleted_consensus(category_mapping, cam, ckm):
-	"""Finds categories where nearly all the children have been deleted"""
+	"""Finds categories where nearly all the children have been deleted.
+	Using the compiled file for everything so might bring out something.
+	A bit hard since it is difficult to tell if something was deleted."""
 	
-	#doesn't really work because it is hard to tell if something was explicitly deleted?
+	fn = 'cx_all_everything_so_far_pass_20141015.txt'
 	
-	del_parents = {}
+	deleted = set()
+	deleted.update(hand_deleted_categories())
 	
-	for parent, children in cam.iteritems():
-		empties = 0
-		deleted = 0
-		if len(children) > 1:
-			ok = True
-			for child in children:
-				if child in category_mapping:
-					if category_mapping[child] != '':
-						ok = False
-						break
-					else:
-						empties += 1
-				else:
-					if child.count("_") < 2:
-						if child in ckm:
-							deleted += 1
-			if ok:
-				if empties > 0:
-					del_parents[parent] = [empties, deleted]
+	print "deleted is of length {0}".format(len(deleted))
 	
-	del_parents = sorted(del_parents.items(), key=lambda x: x[1][1], reverse=True)
+	with copen(fn, encoding='utf8') as f:
+		for line in f:
+			if len(line) > 5:
+				line = line[:-1].split('\t')
+				if len(line) == 2:
+					wiki = line[0]
+					iab = line[1]
+					if iab == 'del':
+						deleted.update([wiki])
 	
-	return del_parents
+	print "Deleted is of length {0}".format(len(deleted))
+	
+	#calculate deletion consensus
+	useful = {}
+	stages = [0, 0, 0, 0]
+	for category, articles in cam.iteritems():
+		d = []
+		blank = []
+		for article in articles:
+			if article in deleted:
+				d.append(article)
+			elif (article in category_mapping) and (category_mapping[article] == ''):
+				blank.append(article)
+			#elif article not in category_mapping:
+			#	if article in ckm:
+			#		if len(ckm[article]) >= 25:
+			#			d.append(article)
+			else:
+				break
+		stages[0] += 1
+		if len(d) > 0:
+			stages[1] += 1
+			if len(blank) > 0:
+				stages[2] += 1
+				if len(d) + len(blank) == len(articles):
+					stages[3] += 1
+					useful[category] = [d, blank]
+	
+	print "Found {0} useful categories, stages: {1}".format(len(useful), stages)
+	useful = sorted(useful.items(), key=lambda x: len(x[1][1]), reverse=True)
+	
+	with copen('cx_deleted_cons_1.txt', 'w', encoding='utf8') as f:
+		for x in useful:
+			f.write(u'###Category:\t\n'.format(x[0]))
+			f.write(u'Deleted:\t{0}\n'.format(x[1]))
+			f.write(u'Blank:\t{0}\n'.format(x[2]))
+			f.write(u'All/incdel:\t\n\n')
+	
+	return useful
 
 def find_things_that_sound_like_people(ender, category_mapping):
 	"""E.g. something_players"""
@@ -849,14 +1070,14 @@ def find_consensus_classifications(cam, category_mapping):
 	
 	suggestions = sorted(suggestions.items(), key=lambda x: len(x[1]['blank']), reverse=True)
 	
-	with copen('cx_consensus_7.txt', 'w', encoding='utf8') as f:
+	with copen('cx_consensus_11.txt', 'w', encoding='utf8') as f:
 		for x in suggestions:
 			f.write(u'category:\t' + x[0] + u'\n')
 			f.write(u'consensus:\t' + x[1]['consensus'] + u"\t(" + u', '.join(x[1]['consensus_items']) + u")\n")
 			f.write(u'need classification:\t' + u'\t'.join(x[1]['blank']) + u"\n")
 			f.write(u'all:\t\n\n')
 	
-	print "Outputted {0} suggestions - in cx_consensus_7.txt".format(len(suggestions))
+	print "Outputted {0} suggestions - in cx_consensus_12.txt".format(len(suggestions))
 
 def find_single_siblings_for_consensus(cam, category_mapping):
 	"""Finds parents with a single classified child"""
@@ -999,13 +1220,16 @@ def find_children_with_lots_of_children(category_mapping, cam):
 	
 	return nest
 
-def find_all_unclassified(category_mapping):
-	with copen('cx_all_4.txt', 'w', encoding='utf') as f:
-		for k,v in category_mapping.iteritems():
-			if v == "":
-				f.write(u"{0}\t\n".format(k))
+def find_all_unclassified(category_mapping, ckm):
 	
-	print "outputted to cx_all_4.txt"
+	data = [[x, len(ckm[x])] for x in category_mapping if (x in ckm) and (category_mapping[x] == "")]
+	data = sorted(data, key=lambda x:x[1], reverse=True)
+	
+	with copen('cx_all_9.txt', 'w', encoding='utf') as f:
+		for x in data:
+			f.write(u"{0}\t\t{1}\n".format(x[0], x[1]))
+	
+	print "outputted to cx_all_9.txt"
 
 def find_words_unique_to_category(ckm, category_mapping):
 	"""Finds words that are unique to a particular classification.
@@ -1045,10 +1269,10 @@ def find_words_unique_to_category(ckm, category_mapping):
 	words = 0 #clear memory
 	
 	#sort
-	useful_words = sorted(useful_words.items(), key=lambda x: x[1][1], reverse=True)[:500]
+	useful_words = sorted(useful_words.items(), key=lambda x: len(x[1][2]), reverse=True)[:500]
 	print "returning {0} useful words".format(len(useful_words))
 	
-	fn = 'cx_keyword_cons_1.txt'
+	fn = 'cx_keyword_cons_3.txt'
 	
 	with copen(fn, 'w', encoding='utf8') as f:
 		for x in useful_words:
@@ -1155,6 +1379,228 @@ def find_entries_with_single_frequencies(ckm, category_mapping):
 					single_counts.update([category])
 	
 	return single_counts
+
+def find_entries_with_all_same_words(ckm, category_mapping):
+	"""Groups entries with all the same words - either only unc-unc or unc-c as well"""
+	
+	#keys are represented as 1_45_99 etc
+	entries = defaultdict(list)
+	
+	#create word:index database
+	#create word_vector:[article, article] database
+	words = defaultdict(int)
+	for article in category_mapping.iterkeys():
+		if article in ckm:
+			r = []
+			for k in ckm[article]:
+				if k not in words:
+					words[k] = len(words)
+				r.append(words[k])
+			r = '_'.join([str(x) for x in sorted(r)])
+			entries[r].append(article)
+	
+	print "Found {0} different words".format(len(words))
+	print "Found {0} different combinations".format(len(entries))
+	
+	already_set = {}
+	for k in entries.keys():
+		already_set[k] = set([int(x) for x in k.split('_')])
+	
+	#now have to calculate 90% similarity between the articles
+	entries_keys = entries.keys()
+	count = 0
+	used = set()
+	for n, word_vector in enumerate(entries_keys):
+		word_vector_set = already_set[word_vector] #get set of word vector for quick comparisons 
+		word_vector_length = float(len(word_vector_set))
+		threshold = 0.5
+		similar = set()
+		intersection_percents = defaultdict(int)
+		for other_word_vector in entries_keys[n+1:]:
+			if other_word_vector != word_vector:
+				other_word_vector_set = already_set[other_word_vector]
+				intersection_size = float(len(word_vector_set.intersection(other_word_vector_set)))
+				intersection_percent = intersection_size/word_vector_length
+				
+				if intersection_percent >= threshold:
+					similar.update(entries[other_word_vector])
+				
+				intersection_percents[intersection_percent] += 1
+		
+		#print len(similar), sorted(intersection_percents.items(), reverse=True)[:5]
+		
+		if len(similar) > 1:
+			similar = [x for x in similar if (x in category_mapping) and (category_mapping[x] == '')]
+			similar += [x for x in entries[word_vector] if (x in category_mapping) and (category_mapping[x] == '')]
+			if len(similar) > 1:
+				count += 1
+				used.update(similar)
+				with copen('cx_keyword_intersection_8.txt', 'a', encoding='utf8') as f:
+					f.write(unicode(similar))
+					f.write(u'\nall:\t\n\n')
+			
+		if n % 250 == 0:
+			print "Done {0}/{1}, written {2}, used {3}".format(n, len(entries), count, len(used))
+
+def find_words_that_have_never_been_classified(category_mapping, ckm):
+	"""Finds groups of categories with words that have never been classified"""
+	
+	#dataset of word: [cat, cat, cat]
+	word_to_category = defaultdict(list)
+	for category in category_mapping.iterkeys():
+		if category in ckm:
+			for word in ckm[category]:
+				word_to_category[word].append(category)
+	
+	print "word to category has {0} words".format(len(word_to_category))
+	
+	#which ones are entirely made up of unclassified items?
+	useful = {}
+	used = set()
+	for word, categories in word_to_category.iteritems():
+		if len(categories) > 1:
+			used.update(categories)
+			ok = True
+			for category in categories:
+				if category in category_mapping:
+					if category_mapping[category] != "":
+						ok = False
+						break
+			if ok:
+				useful[word] = categories
+	
+	word_to_category = 0 #clear memory
+	print "Found {0} useful words, spanning {1} categories".format(len(useful), len(used))
+	
+	useful = sorted(useful.items(), key=lambda x: len(x[1]), reverse=True)
+	
+	fn = 'cx_unclassified_words_1.txt'
+	with copen(fn, 'w', encoding='utf8') as f:
+		for x in useful:
+			f.write(u"\t\t<{0}> is in: {1}\n".format(x[0], x[1]))
+
+def find_categories_with_most_surnames(category_mapping, ckm):
+	
+	surnames = set()
+	with copen('surnames.txt', encoding='utf8') as f:
+		for line in f:
+			if len(line) > 1:
+				line = line[:-1]
+				line = line.lower()
+				surnames.update([line])
+	
+	print "searching {0} surnames".format(len(surnames))
+	
+	useful = {}
+	for category, mapping in category_mapping.iteritems():
+		if mapping == "":
+			if category in ckm:
+				count = len([x for x in ckm[category] if x in surnames])
+				if count > 0:
+					useful[category] = [count, len(ckm[category]), float(count)/float(len(ckm[category]))]
+	
+	print "found {0} useful categories".format(len(useful))
+	
+	useful = sorted(useful.items(), key=lambda x: x[1][2], reverse=True)
+	
+	fn = 'cx_surname_spotter_2.txt'
+	with copen(fn, 'w', encoding='utf8') as f:
+		for x in useful:
+			f.write(u"{0}\t\t{1}\t{2}\t{3}\n".format(x[0], x[1][0], x[1][1], x[1][2]))
+
+def find_categories_where_children_are_mostly_names(category_mapping, ckm, cam):
+	names = set()
+	with copen('surnames.txt', encoding='utf8') as f:
+		for line in f:
+			if len(line) > 1:
+				line = line[:-1]
+				line = line.lower()
+				names.update([line])
+	
+	print "searching {0} names".format(len(names))
+	
+	useful = {}
+	for category, articles in cam.iteritems():
+		if category in category_mapping:
+			if category_mapping[category] == "":
+				name_count = 0.0
+				for article in articles:
+					for word in article.split('_'):
+						if word in names:
+							name_count += 1
+							break
+				pc = name_count/float(len(articles))
+				useful[category] = [pc, len(cam[category])]
+	
+	print "found {0} useful categories".format(len(useful))
+	
+	useful = sorted(useful.items(), key=lambda x: x[1][0], reverse=True)
+	
+	fn = 'cx_child_name_spotter_2.txt'
+	with copen(fn, 'w', encoding='utf8') as f:
+		for x in useful:
+			f.write(u"{0}\t\t{1}\t{2}\n".format(x[0], x[1][0], x[1][1]))
+
+def find_cosim_suggestions(category_mapping, ckm):
+	"""Suggest a category based on cosine similarity - 2meta4me"""
+	
+	#build the tree
+	with copen('mozcat_heirarchy.json', encoding='utf8') as f:
+		tree = load(f)
+		all_cats = set([x for x in chain(*tree.values())] + tree.keys())
+	
+	iab_vectors = defaultdict(lambda: defaultdict(int))
+	to_classify = {}
+	
+	for wiki, iab in category_mapping.iteritems():
+		if wiki in ckm:
+			if iab == "":
+				to_classify[wiki] = sqrt(sum([v**2 for k,v in ckm[wiki].iteritems()]))
+			else:
+				for word, count in ckm[wiki].iteritems():
+					iab_vectors[iab][word] += count
+	
+	#calculate iab magnitudes
+	iab_mags = {}
+	for cat, kws in iab_vectors.iteritems():
+		iab_mags[cat] = sqrt(sum([v**2 for k,v in kws.iteritems()]))
+	
+	#rest of cosim
+	count = 0
+	all_results = []
+	for unc, mag in to_classify.iteritems():
+		
+		results = []
+		
+		for category, iab_kws in iab_vectors.iteritems():
+			#dot product
+			dot_product = 0
+			for kw, value in ckm[unc].iteritems():
+				if kw in iab_kws:
+					dot_product += (value * iab_kws[kw])
+			
+			denominator = mag * iab_mags[category]
+			if denominator != 0:
+				similarity = dot_product / denominator
+				results.append([category, similarity])
+		
+		if len(results) > 0:
+			results = sorted(results, key=lambda x:x[1], reverse=True)
+			results = results[:10]
+			all_results.append([unc, results])
+			count += 1
+		
+		if count % 100 == 0:
+			print "done {0}/{1} in total".format(count, len(to_classify))
+
+	
+	all_results = sorted(all_results, key=lambda x: x[1][0][0], reverse=True) #sorted(all_results, key=lambda x: x[1][0][1], reverse=True)
+	
+	with copen('cx_cosim_10.txt', 'w', encoding='utf8') as f:
+		for x in all_results:
+			f.write(u"{0}\t\t{1}\n".format(x[0], u"\t".join([unicode(y[0])+"#"+unicode(round(y[1], 4)) for y in x[1]])))
+	
+	print "wrote {0} to file using cosim".format(count)
 
 def get_children(o, cam):
 	to_add = set()
@@ -1350,8 +1796,9 @@ def process_keyword_consensus(category_mapping):
 						if decision != "":
 							if decision == 'del':
 								for x in blanks:
-									del category_mapping[x]
-									count += 1
+									if x in category_mapping:
+										del category_mapping[x]
+										count += 1
 							else:
 								if decision not in mozcat:
 									if decision not in new_categories:
@@ -1497,21 +1944,144 @@ def process_everything(category_mapping):
 						for line in f:
 							if len(line) > 3:
 								line = line[:-1].split('\t')
-								category = line[0]
-								decision = line[1]
-								#if len(line) > 2:
-								#	if line[2] != '':
-								#		print line[2]
-								if decision != "":
-									if category in category_mapping:
-										if category_mapping[category] == "":
-											category_mapping[category] = decision
-											classified += 1
+								if len(line) > 1:
+									category = line[0]
+									decision = line[1]
+									if decision != "":
+										if category in category_mapping:
+											if category_mapping[category] == "":
+												category_mapping[category] = decision
+												classified += 1
 					except Exception, e:
-						print Exception, e
+						print Exception, e, line
 	
 	print "Classified {0} using process_everything".format(classified)
 	
+	return category_mapping
+
+def process_keyword_intersection(category_mapping):
+	"""Processes the keyword intersection files """
+	count = 0
+	used = set()
+	stages = [0,0,0,0]
+	for fn in listdir('.'):
+		if ("keyword_intersection" in fn) and ('pass' in fn):
+			with copen(fn, encoding='utf8') as f:
+				data = f.read()
+				data = data.split('\n\t\t\t\t')
+				print "data is of len {0}".format(len(data))
+				for x in data:
+					if len(x) > 5:
+						x = x.split('\n')
+						blanks = []
+						decision = ""
+						if x[0].strip() == "":
+							if len(x) > 2:
+								blanks = literal_eval(x[1].strip())
+								d = x[2].strip().split('\t')
+								if len(d) > 1:
+									decision = d[1] #urgh
+						else:
+							if len(x) > 2:
+								blanks = literal_eval(x[0].strip())
+								d = x[1].strip().split('\t')
+								if len(d) > 1:
+									decision = d[1]
+						if blanks and decision:
+							used.update(blanks)
+							for blank in blanks:
+								if blank in category_mapping:
+									if category_mapping[blank] == '':
+										category_mapping[blank] = decision
+										count += 1
+	
+	print "Classified {0} items, leaving {1}/{2} left, used {3}, stages {4}".format(count, len([x for x in category_mapping if category_mapping[x] == ""]), len(category_mapping), len(used), stages)
+	return category_mapping
+
+def process_unclassified_words(category_mapping):
+	"""Does what it says"""
+	
+	count = 0
+	for fn in listdir('.'):
+		if "cx_unclassified_words_pass" in fn:
+			with copen(fn, encoding='utf8') as f:
+				for line in f:
+					if len(line) > 5:
+						line = line.split('\t')
+						decision = line[0]
+						categories = literal_eval(line[2].split('is in: ')[1])
+						if decision != "":
+							for category in categories:
+								if category in category_mapping:
+									if category_mapping[category] == "":
+										category_mapping[category] = decision
+										count += 1
+	
+	print "Classified {0} using unknown words".format(count)
+	
+	return category_mapping
+
+def process_popular_words(category_mapping):
+	"""Processes categories that were categorized using the "likely candidates" method"""
+	
+	count = 0
+	deleted = 0
+	for fn in listdir("."):
+		if ("pass" in fn) and ("popular_words" in fn):
+			with copen(fn, encoding='utf8') as f:
+				for line in f:
+					if len(line) > 4:
+						line = line[:-2]
+						line = line.split('\t')
+						wiki = line[0]
+						decision = line[1]
+						suggestion = line[2]
+						if decision != "":
+							if wiki in category_mapping:
+								if category_mapping[wiki] == "":
+									if decision in ["3", 'del']:
+										del category_mapping[wiki]
+										deleted += 1
+									elif decision in ["1", "y", "yes"]:
+										category_mapping[wiki] = suggestion
+										count += 1
+									elif decision in ['2', 'no', 'n']:
+										continue
+									else:
+										category_mapping[wiki] = decision
+										count += 1
+	
+	print "classified {0} and deleted {1} using popular words".format(count, deleted)
+	return category_mapping
+
+def process_cosim(category_mapping):
+	count = 0
+	deleted = 0
+	numbers = [str(x) for x in range(1,11)]
+	for fn in listdir("."):
+		if ("pass" in fn) and ("cosim" in fn):
+			with copen(fn, encoding='utf8') as f:
+				for line in f:
+					if len(line) > 4:
+						line = line[:-1].split('\t')
+						category = line[0]
+						decision = line[1]
+						items = line[2:]
+						if decision != "":
+							if category in category_mapping:
+								if category_mapping[category] == "":
+									if decision == 'del':
+										del category_mapping[category]
+										deleted += 1
+									elif decision in numbers:
+										decision = items[int(decision) - 1].split("#")[0]
+										category_mapping[category] = decision
+										count += 1
+									else:
+										category_mapping[category] = decision
+										count += 1
+	
+	print "classified {0} and deleted {1} using cosim".format(count, deleted)
 	return category_mapping
 
 #auto classify
@@ -1724,6 +2294,10 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = process_prefix_classifications(wiki_iab)
 	wiki_iab = process_everything(wiki_iab)
 	wiki_iab = process_keyword_consensus(wiki_iab)
+	wiki_iab = process_keyword_intersection(wiki_iab)
+	wiki_iab = process_unclassified_words(wiki_iab)
+	wiki_iab = process_popular_words(wiki_iab)
+	wiki_iab = process_cosim(wiki_iab)
 	
 	#infer child classifications
 	wiki_iab = classify_children_as_parents(wiki_iab, cam); print "omg 10" if '' in wiki_iab else 'nope not there'

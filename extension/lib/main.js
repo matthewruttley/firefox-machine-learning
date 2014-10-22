@@ -27,6 +27,8 @@ exports.main = function(options, callbacks) {Task.spawn(function*() {
   c = new LWCAClassifier()
   yield c.init();
   visits = [
+			  ['https://www.google.com/webhp?sourceid=chrome-instant&ion=1&espv=2&ie=UTF-8#safe=off&q=chevy%20lowrider%2064', 'Chevy Lowrider 64 - Google Search'],
+			  ['https://www.facebook.com/NewYorkRoadRunners', "New York Road Runners (NYRR)"]
 			  ["http://www.ma-shops.com/", "MA Coin stores with 500.000 Coins - Medals - German Coins - Ancient Coins, World Coins Coins Mall"],
 			  ["http://www.trulia.com/", "Real Estate, Homes for Sale, Apartments for Rent, Local data - Trulia"],
 			  ["http://www.reddit.com/r/conspiracy/comments/2fpq0y/israeli_snipers_shoot_children_playing_on_rooftop/", "Israeli snipers shoot children playing on rooftop in Gaza : conspiracy"],
