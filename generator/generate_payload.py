@@ -2426,12 +2426,13 @@ def generate_payload(ckm, category_mapping):
 	to_save = {}
 	for k,v in ckm.iteritems():
 		if k in category_mapping:
-			v = [x for x in v if x not in stopwords]
 			to_save[k] = v
 	
 	#now save
 	with copen('new_payload.json', 'w', encoding='utf8') as f:
-		dump(to_save, f)
+		payload = dumps(to_save)
+		payload = "payload = " + payload
+		f.write(payload)
 	
 	print "Saved to new_payload.json"
 
