@@ -16,7 +16,7 @@ const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = false
+var verbose = true
 
 function LWCAClassifier(){
 	// Main handler class
@@ -45,9 +45,12 @@ function LWCAClassifier(){
 		
 			//cleaning
 			if (verbose) console.log("title before cleaning: " + title)
-			title = removePersistentTitleChunks(url, title, cdb.persistentTitleChunks)
+			title = removePersistentTitleChunks(url, title, cdb.persistentTitleChunks) //returns a string
+			if (verbose) console.log("removed persistents: " + title)
+			title = getURLChunks(url) + " " + title
+			if (verbose) console.log("added url chunks: " + title)
 			title = removeDomainNames(url, title) //try to remove domain names
-			if (verbose) console.log("after: " + title)
+			if (verbose) console.log("removed domain names: " + title)
 		
 		//classify
 			if (verbose) console.log("Classifying")
@@ -139,17 +142,18 @@ function ComponentDatabase(create_objects=true) {
 			if (verbose) console.log('Found cdb in local directory, importing')
 			yield this.load_component_database();
 			
-			
 			//fill in the rest
 			let cdb = this.scan(ts['start'], ts['end'])
-			//then merge the new stuff with the old stuff
 			
+			//then merge the new stuff with the old stuff
 			//first query variables
 			for (let domain in cdb['queryVariables']) {
+				//python equivalent of this.queryVariables[domain][v] == 1
 				if (this.queryVariables.hasOwnProperty(domain) == false) {
 					this.queryVariables[domain] = {}
 				}
-				for (let v of cdb['queryVariables'][domain]) {
+				console.log('qv domain on 152: ' + JSON.stringify(cdb['queryVariables'][domain]))
+				for (let v in cdb['queryVariables'][domain]) {
 					if (this.queryVariables[domain].hasOwnProperty(v) == false) {
 						this.queryVariables[domain][v] = 1
 					}
@@ -161,6 +165,7 @@ function ComponentDatabase(create_objects=true) {
 				if (this.persistentTitleChunks.hasOwnProperty(domain) == false) {
 					this.persistentTitleChunks[domain] = {}
 				}
+				console.log('v domain on 165: ' + JSON.stringify(cdb['persistentTitleChunks'][domain]))
 				for (let v of cdb['persistentTitleChunks'][domain]) {
 					if (this.persistentTitleChunks[domain].hasOwnProperty(v) == false) {
 						this.persistentTitleChunks[domain][v] = 1
@@ -393,6 +398,28 @@ function removeDomainNames(url, title) {
 	}else{
 		return new_title.join(" ")
 	}	
+}
+
+function getURLChunks(url) {
+	//gets chunks from the URL
+	//this will have filters such as only words that exist in mozcat or something
+	//but that requires a huge amount of edit distance stuff
+	
+	url = url.toLowerCase()
+	//domain = getDomain(url)
+	//url = url.split(domain)[1] //remove domain itself
+	//url = url.split("?")[0] //eliminate query variables
+	
+	url = url.match(wordFinder)
+	
+	useful_words = []
+	for (let word in url) {
+		if (word in mozcat_words) {
+			useful_words.push(word)
+		}
+	}
+	
+	return useful_words.join(" ")
 }
 
 // Classification
@@ -827,7 +854,8 @@ let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.moz
 scriptLoader.loadSubScript(data.url("domainRules.json")); 
 scriptLoader.loadSubScript(data.url("payload.json")); //TODO: combine payload and mapping
 scriptLoader.loadSubScript(data.url("new_mappings.json")); 
-scriptLoader.loadSubScript(data.url("mozcat_heirarchy.json")); 
+scriptLoader.loadSubScript(data.url("mozcat_heirarchy.json"));
+scriptLoader.loadSubScript(data.url("mozcat_words.json"));
 
 function getDomain(url) {
 	//returns the (sub)domain of a url

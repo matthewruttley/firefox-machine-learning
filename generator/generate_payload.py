@@ -13,7 +13,6 @@ from pdb import set_trace
 from re import findall, match
 from math import sqrt
 
-
 stopwords = set(['secondly', 'all', 'consider', 'whoever', 'four', 'edu', 'go', 'causes', 'seemed', 'rd', 'certainly', 'vs', 'to', 'asking', 'th', 'under', 'sorry', 'sent',
 					 'far', 'every', 'yourselves', 'went', 'did', 'forth', 'try', 'says', 'yourself', 'likely', 'further', 'even', 'what', 'appear', 'brief', 'goes', 'sup', 'new',
 					 'ever', 'hasn', 'whose', 'respectively', 'never', 'here', 'shouldn', 'let', 'others', 'alone', 'along', 'quite', 'allows', 'howbeit', 'usually', 'whereupon',
@@ -432,6 +431,8 @@ def resolve_mistakes(category_mapping):
 	
 	"""
 	
+	print '1--------------> {0}'.format(category_mapping['journalism_standards'])
+	
 	#first load the heirarchy into memory
 	with open('mozcat_heirarchy.json') as f:
 		tree = load(f)
@@ -443,6 +444,8 @@ def resolve_mistakes(category_mapping):
 		
 		for top_level in tree.iterkeys():
 			tree[top_level] = set(tree[top_level])
+	
+	print '2--------------> {0}'.format(category_mapping['journalism_standards'])
 	
 	#remove things from the taxonomy that we know aren't used
 	sub_cat_remove = set([u'cell phones', u'hotel', u'graduate school', u'local news', u'windows ', u'north_korea', u'greenland', u'sri_lanka', 'greenland'])
@@ -461,6 +464,8 @@ def resolve_mistakes(category_mapping):
 			if x in v:
 				tree[k].remove(x)
 	
+	print '3--------------> {0}'.format(category_mapping['journalism_standards'])
+	
 	#now clean up some of the mappings that contain extra whitespace, upper case, underscores etc
 	cleaned = {}
 	for k,v in category_mapping.iteritems():
@@ -469,9 +474,221 @@ def resolve_mistakes(category_mapping):
 	category_mapping = cleaned
 	cleaned = 0 #free up memory
 	
+	print '4--------------> {0}'.format(category_mapping['journalism_standards'])
 	
 	#these are basic corrections:
 	corrections = {
+		u'telephone_crimes': 'crime',
+		u'families': 'del',
+		u'pool_organizations': 'del',
+		u'naval_mines': 'military',
+		u'teletraffic': 'del',
+		u'multiple_choice': 'del',
+		u'athletics_organisations': 'sports',
+		u'wiccan_terminology': 'wicca',
+		u'fashion_designers': 'fashion',
+		u'family_associations': 'del',
+		u'badminton_organisations': 'badminton',
+		u'sports_organisations': 'sports',
+		u'ims_services': 'del',
+		u'public_phones': 'cell phones',
+		u'piano': 'instruments',
+		u'como\xe9_province': 'del',
+		u'telenor': 'del',
+		u'motorcycling_media': 'motorcycles',
+		u'plze\u0148-south_district': 'del',
+		u'wirral_(borough)': 'united kingdom',
+		u'softbank': 'cell phones',
+		u'metal_forming': 'metalworking',
+		u'buddhist_priestesses': 'buddhism',
+		u'dirt_biking': 'motorcycles',
+		u'belfast': 'united kingdom',
+		u'broadcasting_schools': 'del',
+		u'dance_awards': 'dance',
+		u'derry': 'ireland',
+		u'inuit_groups': 'anthropology',
+		u'bell_system': 'del',
+		u'language_orthographies': 'languages',
+		u'jinju': 'south korea',
+		u'telephone_tapping': 'military',
+		u'cooking_oils': 'cooking',
+		u'inussulik_bay': 'del',
+		u'at&t_people': 'del',
+		u'ymca': 'hotels',
+		u'telstra': 'del',
+		u'journalism_ethics': 'journalism',
+		u'baffin_bay': 'del',
+		u't\u0159eb\xed\u010d_district': 'del',
+		u'fr\xfddek-m\xedstek_district': 'del',
+		u'motorola': 'cell phones',
+		u'buddhist_views': 'buddhism',
+		u'indian_slang': 'del',
+		u'symbian_os': 'cell phones',
+		u'high_wycombe': 'united kingdom',
+		u'krom\u011b\u0159\xed\u017e_district': 'del',
+		u'sleep_physiology': 'sleeping disorders',
+		u'chinese_porcelain': 'pottery',
+		u'labidochromis': 'del',
+		u'bell_canada': 'cell phones',
+		u'\u0161umperk_district': 'del',
+		u'vimpelcom_ltd.': 'del',
+		u'bird_sanctuaries': 'birdwatching',
+		u'juvenile_series': 'del',
+		u'cheshire': 'united kingdom',
+		u'toy_instruments': 'del',
+		u'buddhist_orders': 'buddhism',
+		u'flagstaff,_arizona': 'usa',
+		u'korean_migration': 'south korea',
+		u'sandwell': 'del',
+		u'haplochromini': 'del',
+		u'buddhist_schools': 'buddhism',
+		u'food_network': 'cooking',
+		u'mal\xe9': 'del',
+		u'nortel': 'cell phones',
+		u'zen_texts': 'philosophy',
+		u'ellesmere_island': 'del',
+		u'kitchen_knives': 'cooking',
+		u'alphabetic_diacritics': 'del',
+		u'litom\u011b\u0159ice_district': 'del',
+		u'vy\u0161kov_district': 'del',
+		u'indole_alkaloids': 'chemistry',
+		u'upernavik_archipelago': 'del',
+		u't\xe1bor_district': 'del',
+		u'pseudotropheus': 'del',
+		u'mungyeong': 'south korea',
+		u"n'd\xe9l\xe9": 'del',
+		u'surfing_equipment': 'surfing',
+		u'stradivari_violins': 'instruments',
+		u'anti-buddhism': 'buddhism',
+		u'bedfordshire': 'united kingdom',
+		u'buddhist_monks': 'buddhism',
+		u'motorcycle_regulation': 'motorcycles',
+		u'bal\xe9_province': 'del',
+		u'semi-acoustic_guitars': 'instruments',
+		u'resophonic_instruments': 'instruments',
+		u'flavour_enhancers': 'cooking',
+		u'baz\xe8ga_province': 'del',
+		u'york': 'united kingdom',
+		u'birding': 'birdwatching',
+		u'at&t': 'del',
+		u'avon': 'united kingdom',
+		u'centurylink': 'del',
+		u'fender_telecasters': 'instruments',
+		u'yidams': 'del',
+		u'kangerlussuaq': 'del',
+		u'flavor_technology': 'del',
+		u'violin_competitions': 'instruments',
+		u'lutherie': 'instruments',
+		u'tasiusaq_bay': 'del',
+		u'gwangju': 'south korea',
+		u's\u0165\xe1\u0165imc': 'del',
+		u'staffordshire': 'united kingdom',
+		u'hillclimbing': 'del',
+		u'heiltsuk': 'del',
+		u'algonquin': 'del',
+		u'cyrillic_letters': 'del',
+		u'ji\u010d\xedn_district': 'del',
+		u'gyeonggi_province': 'south korea',
+		u'illuminated_psalters': 'del',
+		u'buddha_statues': 'del',
+		u'cargo_liners': 'shipping',
+		u'l\u014d': 'del',
+		u'motorcycle_trials': 'motorcycles',
+		u'cooking_schools': 'cooking',
+		u'cooking_competitions': 'cooking',
+		u'cooking_techniques': 'cooking',
+		u'chinese_bronzeware': 'pottery',
+		u'bene\u0161ov_district': 'del',
+		u'plze\u0148': 'del',
+		u'inuit_organizations': 'anthropology',
+		u'motorcycling_events': 'motorcycles',
+		u'petroleum': 'energy',
+		u'p\u0159erov_district': 'del',
+		u'ting': 'del',
+		u'amedia': 'del',
+		u'harpsichord': 'instruments',
+		u'iphone': 'cell phones',
+		u'buddhist_abbesses': 'del',
+		u'anime_conventions': 'animation',
+		u'd\xfan_laoghaire': 'del',
+		u'fender_amplifiers': 'del',
+		u'worcestershire': 'united kingdom',
+		u'nokia_services': 'cell phones',
+		u'ywca': 'hotels',
+		u'jukebox_musicals': 'del',
+		u'ceramics_manufacturers': 'pottery',
+		u'p\u0159\xedbram_district': 'del',
+		u'prost\u011bjov_district': 'del',
+		u'kol\xedn_district': 'germany',
+		u'gangjin': 'south korea',
+		u'b\u0159eclav_district': 'del',
+		u'chungju': 'del',
+		u'fender_stratocasters': 'instruments',
+		u'mobile_phones': 'cell phones',
+		u'smartphones': 'cell phones',
+		u'boulkiemd\xe9_province': 'del',
+		u'motorcycle_races': 'motorcycles',
+		u'northumberland': 'united kingdom',
+		u'cellos': 'instruments',
+		u'sidecars': 'del',
+		u'qualcomm': 'del',
+		u'itu-t_recommendations': 'del',
+		u'incheon': 'south korea',
+		u'st_andrews': 'united kingdom',
+		u'bird_observatories': 'birdwatching',
+		u'buddhist_practices': 'buddhism',
+		u'hyatt': 'hotels',
+		u'bell_labs': 'del',
+		u'cooking_fats': 'cooking',
+		u'ericsson': 'cell phones',
+		u'motorcycle_safety': 'motorcycles',
+		u'cooking_utensils': 'cooking',
+		u'merseyside': 'united kingdom',
+		u'county_kerry': 'ireland',
+		u'journalism_standards': 'journalism',
+		u'zl\xedn_district': 'del',
+		u'motorcycle_speedway': 'motorcycles',
+		u'melville_bay': 'del',
+		u'pelh\u0159imov_district': 'del',
+		u'p\xedsek_district': 'del',
+		u'greek_alphabet': 'del',
+		u'wonju': 'south korea',
+		u'quebecor': 'canada',
+		u'bird_feeding': 'birdwatching',
+		u'vodafone': 'cell phones',
+		u'sleep_researchers': 'sleeping disorders',
+		u'sisimiut': 'del',
+		u'electronic_organs': 'instruments',
+		u'voip_hardware': 'computer networking',
+		u'nuuk': 'del',
+		u'culinary_arts': 'cooking',
+		u'cooking_appliances': 'cooking',
+		u'shinbutsu_sh\u016bg\u014d': 'del',
+		u'buddhist_tantras': 'del',
+		u'nokia_assets': 'del',
+		u'whistles': 'del',
+		u'syilx': 'del',
+		u'alcatel-lucent': 'cell phones',
+		u'd\u011b\u010d\xedn_district': 'del',
+		u'am\xe9rica_m\xf3vil': 'cell phones',
+		u'hedgehogs': 'animals',
+		u'flute_makers': 'instruments',
+		u'ios_jailbreaking': 'cell phones',
+		u'zambian_music': 'music',
+		u'lancashire': 'united kingdom',
+		u'sprint_nextel': 'cell phones',
+		u'ornithology_awards': 'birdwatching',
+		u'blackberry_(company)': 'cell phones',
+		u'palm_os': 'cell phones',
+		u'jeju_province': 'south korea',
+		u'mokpo': 'del',
+		u'media_influence': 'del',
+		u'earth_oven': 'del',
+		u'guitar_pickups': 'del',
+		u'gangneung': 'del',
+		u'plze\u0148-north_district': 'del',
+		u'ballet_venues': 'del',
+		u'doma\u017elice_district': 'del',
 		u'al-azhar_university': 'university',
 		u'achievement_tests': 'education',
 		u'lichtenfels_(district)': 'germany',
@@ -883,6 +1100,8 @@ def resolve_mistakes(category_mapping):
 		u'family': 'family & parenting',
 	}
 	
+	print '5--------------> {0}'.format(category_mapping['journalism_standards'])
+	
 	for old,new in category_corrections.iteritems():
 		#split up v
 		new = new.split('_')
@@ -923,6 +1142,8 @@ def resolve_mistakes(category_mapping):
 		if v in del_matchers:
 			to_delete.update([k])
 	
+	print '6--------------> {0}'.format(category_mapping['journalism_standards'])
+	
 	for x in to_delete:
 		del category_mapping[x]
 	
@@ -935,8 +1156,12 @@ def resolve_mistakes(category_mapping):
 	used_cats = set(category_mapping.values())
 	print "Un-used cats: {0}".format([x for x in all_cats if x not in used_cats])
 	
+	print '7--------------> {0}'.format(category_mapping['journalism_standards'])
 	
 	#consider removing travel category
+	
+	#remove random crap
+	del tree['m']
 	
 	return category_mapping, tree
 
@@ -2372,14 +2597,19 @@ def assign_iab_categories(ckm, cam):
 	for category in ckm.iterkeys():
 		wiki_iab[category] = new_mappings[category] if category in new_mappings else ""
 	
+	print 'pre a--------------> {0}'.format(wiki_iab['journalism_standards'])
+	
 	#now try and find geographical locations
 	wiki_iab = classify_geo_locations(wiki_iab, cam)
+	
+	print 'a--------------> {0}'.format(wiki_iab['journalism_standards'])
 	
 	#process components
 	wiki_iab = classify_using_components(cam, wiki_iab)
 	
 	#process hand classifications
 	wiki_iab = process_consensus_classifications(wiki_iab, show_not_found=True)
+	print 'b--------------> {0}'.format(wiki_iab['journalism_standards'])
 	wiki_iab = process_blank_classifications(wiki_iab, show_not_found=True)
 	wiki_iab = process_lots_of_parents_classifications(wiki_iab)
 	wiki_iab = process_suffix_classifications(wiki_iab)
@@ -2388,6 +2618,7 @@ def assign_iab_categories(ckm, cam):
 	wiki_iab = process_keyword_consensus(wiki_iab)
 	wiki_iab = process_keyword_intersection(wiki_iab)
 	wiki_iab = process_unclassified_words(wiki_iab)
+	print 'c--------------> {0}'.format(wiki_iab['journalism_standards'])
 	wiki_iab = process_popular_words(wiki_iab)
 	wiki_iab = process_cosim(wiki_iab)
 	
@@ -2436,6 +2667,36 @@ def generate_payload(ckm, category_mapping):
 	
 	print "Saved to new_payload.json"
 
+def generate_mozcat_words():
+	"""A list of useful words for classification"""
+	
+	#get all words
+	with open('mozcat_heirarchy.json') as f:
+		tree = load(f)
+		words = [x for x in chain(*tree.values())] + tree.keys()
+		words = set(words)
+	
+	#now split up things with spaces
+	to_add = set()
+	for word in words:
+		to_add.update(word.split(" "))
+	words.update(to_add)
+	
+	#now deal with stemming (just 's' for now)
+	stems = set()
+	for x in words:
+		if x.endswith('s'):
+			stems.update([x[:-1]])
+	words.update(stems)
+	
+	#remove stopwords
+	words = [x for x in words if x not in stopwords]
+	
+	with copen('mozcat_words.json', 'w', encoding='utf8') as f:
+		words = dumps(words)
+		words = 'mozcat_words = ' + words
+		f.write(words)
+
 #handle all the functions
 
 def create_payload():
@@ -2470,3 +2731,4 @@ def create_payload():
 	
 	#now actually generate a new payload
 	generate_payload.generate_payload(category_keyword_matrix, category_mapping)
+	generate_payload.generate_mozcat_words()
