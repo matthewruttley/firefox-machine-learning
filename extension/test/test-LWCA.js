@@ -6,6 +6,7 @@ const test = require("sdk/test");
 const {LWCAClassifier} = require("lwca_refined");
 let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
 scriptLoader.loadSubScript(data.url("test/cnn_docs.js"));
+scriptLoader.loadSubScript(data.url("test/edRules_docs.js"));
 
 let useWhiteList = false;
 let whiteList = {
@@ -13,9 +14,11 @@ let whiteList = {
 };
 
 let useUrlSplitting = false;
-let urlSplitPattern = /[\/]/;
+let urlSplitPattern = /[\/-]/;
 
 function testVisit(visit, doFulleTest=false) {
+  if (!visit || !visit[0] || !visit[1]) return null;
+  //console.log("Categorizing: ", visit[0], visit[1]);
   let titleCat, fulltextCat;
   let urlParts = "";
   if (useUrlSplitting) {
@@ -28,18 +31,19 @@ function testVisit(visit, doFulleTest=false) {
   return [titleCat, fulltextCat];
 }
 
-function testVisits(visits) {
+function testVisits(visits, ftLen=20) {
    let titleResults = {};
    let fullTextResults = {};
    let fullTextCount = 0;
    let len = visits.length;
-   let ftLen = 20;
    for (let visit of visits) {
     let results = testVisit(visit, fullTextCount < ftLen);
-    titleResults[results[0]] = (titleResults[results[0]] || 0) + 1;
-    if (fullTextCount < ftLen) {
-      fullTextResults[results[1]] = (fullTextResults[results[1]] || 0) + 1;
-      fullTextCount++;
+    if (results) {
+      titleResults[results[0]] = (titleResults[results[0]] || 0) + 1;
+      if (fullTextCount < ftLen) {
+        fullTextResults[results[1]] = (fullTextResults[results[1]] || 0) + 1;
+        fullTextCount++;
+      }
     }
    }
    Object.keys(titleResults).forEach(cat => {
@@ -66,6 +70,9 @@ function outputCatResults(results, catName, expectedCat) {
   while (titleOrdered.length) {
     let tCat = titleOrdered.shift();
     let fCat = fullTextOrdered.shift();
+    if (results.title[tCat] <= 0) {
+      break;
+    }
     dump("\t" + tCat + ":" + results.title[tCat] + "%");
     if (fCat) {
       dump("\t\t\t" + fCat + ":" + results.fullText[fCat] + "%");
@@ -75,7 +82,7 @@ function outputCatResults(results, catName, expectedCat) {
   dump("\n");
 }
 
-function procTestSet(testSet, name) {
+function procTestSet(testSet, name, ftLen=20) {
   dump("TEST SET: " + name + "\n");
   Object.keys(testSet).forEach(cat => {
     let obj = testSet[cat];
@@ -84,12 +91,12 @@ function procTestSet(testSet, name) {
     else {
       if (useWhiteList) {
         if (whiteList[obj.expectedCat]) {
-          let results = testVisits(obj.visits);
+          let results = testVisits(obj.visits, ftLen);
           outputCatResults(results, obj.name, obj.expectedCat);
         }
       }
       else {
-       let results = testVisits(obj.visits);
+       let results = testVisits(obj.visits, ftLen);
        outputCatResults(results, obj.name, obj.expectedCat);
       }
     }
@@ -100,20 +107,36 @@ let classifier = null;
 
 function initClassifier() {
   if (classifier == null) {
+    dump("Loading LWCA...\n");
     classifier = new LWCAClassifier();
-    return classifier.init();
+    return classifier.init().then(() => {
+      dump("Finished loading LWCA\n");
+    });
   }
   return Promise.resolve();
 }
 
-exports["test LWCA"] =
-function test_LWCA(assert, done) {
+exports["test CNN"] =
+function test_CNN(assert, done) {
   Task.spawn(function() {
     try {
-      dump("Loading LWCA...\n");
       yield initClassifier();
-      dump("Fnished loading LWCA\n");
       procTestSet(cnnTest, "CNN PATH SELECTED DOCS");
+      assert.ok(true);
+      done();
+    } catch (ex) {
+      dump(ex + " ERROR");
+      done();
+    }
+  });
+}
+
+exports["test EDRULES"] =
+function test_EDRULES(assert, done) {
+  Task.spawn(function() {
+    try {
+      yield initClassifier();
+      procTestSet(edRules, "EDRULES DOCS");
       assert.ok(true);
       done();
     } catch (ex) {
