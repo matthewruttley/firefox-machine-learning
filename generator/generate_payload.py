@@ -13,6 +13,39 @@ from pdb import set_trace
 from re import findall, match
 from math import sqrt
 
+
+stopwords = set(['secondly', 'all', 'consider', 'whoever', 'four', 'edu', 'go', 'causes', 'seemed', 'rd', 'certainly', 'vs', 'to', 'asking', 'th', 'under', 'sorry', 'sent',
+					 'far', 'every', 'yourselves', 'went', 'did', 'forth', 'try', 'says', 'yourself', 'likely', 'further', 'even', 'what', 'appear', 'brief', 'goes', 'sup', 'new',
+					 'ever', 'hasn', 'whose', 'respectively', 'never', 'here', 'shouldn', 'let', 'others', 'alone', 'along', 'quite', 'allows', 'howbeit', 'usually', 'whereupon',
+					 'changes', 'thats', 'hither', 'via', 'followed', 'merely', 'while', 'viz', 'everybody', 'use', 'from', 'would', 'contains', 'two', 'next', 'few', 'therefore',
+					 'taken', 'themselves', 'thru', 'tell', 'more', 'knows', 'becomes', 'hereby', 'herein', 'everywhere', 'particular', 'known', 'must', 'me', 'none', 'this', 'oh',
+					 'anywhere', 'nine', 'can', 'theirs', 'following', 'my', 'example', 'indicated', 'indicates', 'something', 'want', 'needs', 'rather', 'meanwhile', 'how', 'instead',
+					 'okay', 'tried', 'may', 'after', 'different', 'hereupon', 'such', 'a', 'third', 'whenever', 'maybe', 'appreciate', 'ones', 'so', 'specifying', 'allow',
+					 'keeps', 'six', 'help', 'indeed', 'over', 'mainly', 'soon', 'course', 'through', 'looks', 'still', 'its', 'before', 'thank', 'thence', 'selves', 'inward',
+					 'll', 'actually', 'better', 'willing', 'thanx', 'ours', 'might', 'then', 'non', 'someone', 'somebody', 'than', 'they', 'not', 'now', 'nor', 'several',
+					 'hereafter', 'always','reasonably', 'didn', 'whither', 'each', 'entirely', 'mean', 'everyone', 'doing', 'eg', 'weren', 'ex', 'our', 'beyond', 'out', 'them',
+					 'furthermore', 'since', 'looking', 're', 'seriously', 'got', 'cause', 'thereupon', 'given', 'like', 'que', 'besides', 'ask', 'anyhow', 'couldn', 'could',
+					 'tries', 'keep', 'isn', 'ltd', 'hence', 'onto', 'think', 'first', 'already', 'seeming', 'thereafter', 'one', 'done', 'another', 'wasn', 'awfully', 'little',
+					 'their', 'accordingly', 'least', 'name', 'anyone', 'indicate', 'too', 'gives', 'mostly', 'behind', 'nobody', 'took', 'immediate', 'regards', 'somewhat', 'off',
+					 'believe', 'herself', 'haven', 'specify', 'unfortunately', 'gotten', 'second', 'i', 'were', 'toward', 'are', 'and', 'beforehand', 'say', 'unlikely', 'have', 'need',
+					 'seen', 'seem', 'saw', 'any', 'relatively', 'zero', 'thoroughly', 'latter', 'that', 'downwards', 'aside', 'thorough', 'also', 'take', 'which', 'exactly', 'unless',
+					 'shall', 'who', 'most', 'eight', 'but', 'nothing', 'why', 'sub', 'don', 'especially', 'noone', 'later', 'm', 'yours', 'definitely', 'normally', 'came', 'saying',
+					 'particularly', 'anyway', 'fifth', 'hadn', 'outside', 'should', 'only', 'going', 'do', 'his', 'above', 'get', 'between', 'overall', 'truly', 'cannot', 'nearly',
+					 'despite', 'during', 'him', 'regarding', 'qv', 'twice', 'she', 'contain', 'where', 'thanks', 'ignored', 'namely', 'anyways', 'best', 'wonder', 'said', 'away',
+					 'currently', 'please', 'enough', 'won', 'various', 'hopefully', 'probably', 'neither', 'across', 'available', 'we', 'useful', 'however', 'come', 'both', 'c',
+					 'last', 'many', 'whereafter', 'according', 'against', 'etc', 's', 'became', 'com', 'comes', 'otherwise', 'among', 'presumably', 'co', 'afterwards', 'seems',
+					 'whatever', 'hers', 'moreover', 'throughout', 'considering', 'sensible', 'described', 'three', 'been', 'whom', 'much', 'wherein', 'hardly', 'wants', 'corresponding',
+					 'latterly', 'concerning', 'else', 'former', 'those', 'myself', 'novel', 'look', 'these', 'value', 'will', 'near', 'ain', 'theres', 'seven', 've', 'wouldn',
+					 'almost', 'wherever', 'is', 'thus', 'it', 'cant', 'itself', 'in', 'ie', 'if', 'containing', 'thereby', 'perhaps', 'insofar', 'same', 'clearly', 'beside',
+					 'when', 'gets', 'used', 'see', 'somewhere', 'upon', 'uses', 'kept', 'whereby', 'nevertheless', 'whole', 'well', 'anybody', 'obviously',
+					 'without', 'very', 'the', 'self', 'know', 'lest', 'just', 'less', 'being', 'able', 'liked', 'greetings', 'regardless', 'yes', 'yet', 'unto', 'had', 'except',
+					 'has', 'ought', 'around', 'possible', 'five', 'mon', 'using', 'apart', 'necessary', 'd', 'follows', 't', 'become', 'towards', 'therein', 'because', 'old',
+					 'often', 'some', 'somehow', 'sure', 'specified', 'ourselves', 'happens', 'for', 'though', 'per', 'everything', 'does', 'provides', 'tends', 'either', 'be',
+					 'nowhere', 'although', 'by', 'on', 'about', 'ok', 'anything', 'getting', 'of', 'whence', 'plus', 'consequently', 'or', 'seeing', 'own', 'formerly', 'into',
+					 'within', 'down', 'appropriate', 'right', 'your', 'her', 'aren', 'there', 'inasmuch', 'inner', 'way', 'was', 'himself', 'elsewhere', 'becoming', 'amongst',
+					 'hi', 'trying', 'with', 'he', 'whether', 'wish', 'up', 'us', 'until', 'placed', 'below', 'un', 'gone', 'sometimes', 'associated', 'certain', 'am', 'doesn', 'an',
+					 'as', 'sometime', 'at', 'et', 'inc', 'again', 'no', 'whereas', 'nd', 'lately', 'other', 'you', 'really', 'welcome', 'together', 'having', 'serious', 'hello', 'once'])
+
 geo = {
 	'countries': [	'the_bahamas', "the_gambia", 'bosnia_and_herzegovina', 'the_central_african_republic', 'the_czech_republic', 'the_dominican_republic', 'the_republic_of_ireland', 'north_korea', 'south_korea',
 					'the_marshall_islands', 'the_maldives', 'myanmar', 'burma', 'saint_kitts_and_nevis', 'saint_lucia', 'saint_vincent_and_the_grenadines', 'the_solomon_islands', 'trinidad_and_tobago', 'the_united_arab_emirates', 'the_united_kingdom',
@@ -315,8 +348,7 @@ def matches_meta(text):
 			return True
 	return False
 
-def remove_stopwords(keywords):
-	stopwords = set(['a', 'able', 'about', 'above', 'abst', 'accordance', 'according', 'accordingly', 'across', 'act', 'actually', 'added', 'adj', 'affected', 'affecting', 'affects', 'after', 'afterwards', 'again', 'against', 'ah', 'all', 'almost', 'alone', 'along', 'already', 'also', 'although', 'always', 'am', 'among', 'amongst', 'an', 'and', 'announce', 'another', 'any', 'anybody', 'anyhow', 'anymore', 'anyone', 'anything', 'anyway', 'anyways', 'anywhere', 'apparently', 'approximately', 'are', 'aren', 'arent', 'arise', 'around', 'as', 'aside', 'ask', 'asking', 'at', 'auth', 'available', 'away', 'awfully', 'b', 'back', 'be', 'became', 'because', 'become', 'becomes', 'becoming', 'been', 'before', 'beforehand', 'begin', 'beginning', 'beginnings', 'begins', 'behind', 'being', 'believe', 'below', 'beside', 'besides', 'between', 'beyond', 'biol', 'both', 'brief', 'briefly', 'but', 'by', 'c', 'ca', 'came', 'can', 'cannot', 'cause', 'causes', 'certain', 'certainly', 'co', 'com', 'come', 'comes', 'contain', 'containing', 'contains', 'could', 'couldnt', 'd', 'date', 'did', 'different', 'do', 'does', 'doing', 'done', 'down', 'downwards', 'due', 'during', 'e', 'each', 'ed', 'edu', 'effect', 'eg', 'eight', 'eighty', 'either', 'else', 'elsewhere', 'end', 'ending', 'enough', 'especially', 'et', 'et-al', 'etc', 'even', 'ever', 'every', 'everybody', 'everyone', 'everything', 'everywhere', 'ex', 'except', 'f', 'far', 'few', 'ff', 'fifth', 'first', 'five', 'fix', 'followed', 'following', 'follows', 'for', 'former', 'formerly', 'forth', 'found', 'four', 'from', 'further', 'furthermore', 'g', 'gave', 'get', 'gets', 'getting', 'give', 'given', 'gives', 'giving', 'go', 'goes', 'gone', 'got', 'gotten', 'h', 'had', 'happens', 'hardly', 'has', 'have', 'having', 'he', 'hed', 'hence', 'her', 'here', 'hereafter', 'hereby', 'herein', 'heres', 'hereupon', 'hers', 'herself', 'hes', 'hi', 'hid', 'him', 'himself', 'his', 'hither', 'home', 'how', 'howbeit', 'however', 'hundred', 'i', 'id', 'ie', 'if', 'im', 'immediate', 'immediately', 'importance', 'important', 'in', 'inc', 'indeed', 'index', 'information', 'instead', 'into', 'invention', 'inward', 'is', 'it', 'itd', 'its', 'itself', 'j', 'just', 'k', 'keep', 'keeps', 'kept', 'kg', 'km', 'know', 'known', 'knows', 'l', 'largely', 'last', 'lately', 'later', 'latter', 'latterly', 'least', 'less', 'lest', 'let', 'lets', 'like', 'liked', 'likely', 'line', 'little', 'look', 'looking', 'looks', 'ltd', 'm', 'made', 'mainly', 'make', 'makes', 'many', 'may', 'maybe', 'me', 'mean', 'means', 'meantime', 'meanwhile', 'merely', 'mg', 'might', 'million', 'miss', 'ml', 'more', 'moreover', 'most', 'mostly', 'mr', 'mrs', 'much', 'mug', 'must', 'my', 'myself', 'n', 'na', 'name', 'namely', 'nay', 'nd', 'near', 'nearly', 'necessarily', 'necessary', 'need', 'needs', 'neither', 'never', 'nevertheless', 'new', 'next', 'nine', 'ninety', 'no', 'nobody', 'non', 'none', 'nonetheless', 'noone', 'nor', 'normally', 'nos', 'not', 'noted', 'nothing', 'now', 'nowhere', 'o', 'obtain', 'obtained', 'obviously', 'of', 'off', 'often', 'oh', 'ok', 'okay', 'old', 'omitted', 'on', 'once', 'one', 'ones', 'only', 'onto', 'or', 'ord', 'other', 'others', 'otherwise', 'ought', 'our', 'ours', 'ourselves', 'out', 'outside', 'over', 'overall', 'owing', 'own', 'p', 'page', 'pages', 'part', 'particular', 'particularly', 'past', 'per', 'perhaps', 'placed', 'please', 'plus', 'poorly', 'possible', 'possibly', 'potentially', 'pp', 'predominantly', 'present', 'previously', 'primarily', 'probably', 'promptly', 'proud', 'provides', 'put', 'q', 'que', 'quickly', 'quite', 'qv', 'r', 'ran', 'rather', 'rd', 're', 'readily', 'really', 'recent', 'recently', 'ref', 'refs', 'regarding', 'regardless', 'regards', 'related', 'relatively', 'research', 'respectively', 'resulted', 'resulting', 'results', 'right', 'run', 's', 'said', 'same', 'saw', 'say', 'saying', 'says', 'sec', 'section', 'see', 'seeing', 'seem', 'seemed', 'seeming', 'seems', 'seen', 'self', 'selves', 'sent', 'seven', 'several', 'shall', 'she', 'shed', 'shes', 'should', 'show', 'showed', 'shown', 'showns', 'shows', 'significant', 'significantly', 'similar', 'similarly', 'since', 'six', 'slightly', 'so', 'some', 'somebody', 'somehow', 'someone', 'somethan', 'something', 'sometime', 'sometimes', 'somewhat', 'somewhere', 'soon', 'sorry', 'specifically', 'specified', 'specify', 'specifying', 'still', 'stop', 'strongly', 'sub', 'substantially', 'successfully', 'such', 'sufficiently', 'suggest', 'sup', 'sure'])
+def remove_stopwords(keywords):	
 	new_keywords = {}
 	for k,v in keywords.iteritems():
 		if len(k) > 2:
@@ -440,6 +472,66 @@ def resolve_mistakes(category_mapping):
 	
 	#these are basic corrections:
 	corrections = {
+		u'al-azhar_university': 'university',
+		u'achievement_tests': 'education',
+		u'lichtenfels_(district)': 'germany',
+		u'labor_schools': 'del',
+		u'metopoceras': 'del',
+		u'sotogahama,_aomori': 'japan',
+		u'sourdough_breads': 'baking',
+		u'ishinomaki_line': 'trains',
+		u'exhibition_designers': 'del',
+		u'west_lancashire': 'united kingdom',
+		u'unesco_directors-general': 'del',
+		u'geum_(plant)': 'botany',
+		u'bled': 'del',
+		u'oklahoma_statutes': 'del',
+		u'oman-related_lists': 'oman',
+		u'dutch-speaking_countries': 'netherlands',
+		u'somalia-related_lists': 'somalia',
+		u'meitetsu_group': 'del',
+		u'rai_(broadcaster)': 'television',
+		u'kuwait-related_lists': 'kuwait',
+		u'amphetamine_alkaloids': 'del',
+		u'welfare_reform': 'del',
+		u'sports_ministries': 'del',
+		u'muraena': 'del',
+		u'nationalization': 'del',
+		u'zambia-related_lists': 'zambia',
+		u'sage_group': 'del',
+		u'presidential_scholars': 'del',
+		u'dental_examinations': 'dental care',
+		u'media_industry': 'del',
+		u'bucharest-related_lists': 'hungary',
+		u'canadian_tire': 'del',
+		u'olive_cultivars': 'del',
+		u'http_clients': 'internet technology',
+		u'hominina': 'del',
+		u'combination_events': 'del',
+		u'callionima': 'del',
+		u'dental_consonants': 'del',
+		u'naples-related_lists': 'italy',
+		u'lada_vehicles': 'del',
+		u'mexican-american_cuisine': 'american cuisine',
+		u'nakano,_tokyo': 'japan',
+		u'night_lizards': 'reptiles',
+		u'belize-related_lists': 'belize',
+		u'germanic_studies': 'germany',
+		u'joinville': 'del',
+		u'mexborough': 'del',
+		u'tajik_cuisine': 'food & drink',
+		u'syria-related_lists': 'syria',
+		u'luxembourg-related_lists': 'luxembourg',
+		u'twin_studies': 'pregnancy',
+		u'thysanura': 'del',
+		u'zoologists': 'del',
+		u'ter_alsace': 'del',
+		u'botswana-related_lists': 'botswana',
+		u'togo-related_lists': 'togo',
+		u'schizophrenia-related_organisations': 'psychology & psychiatry',
+		u'yemen-related_lists': 'yemen',
+		u'dymi': 'del',
+		u'schreder_aircraft': 'air_travel',		
 		'shipping_companies': 'business',
 		'pharmaceutical_companies': 'business', 'dental_companies': 'dental care', 'ontario_hydro': 'energy', 'performance_management': 'business', 'translation_companies': 'languages', 'imperial_tobacco': 'smoking',
 		'trade': 'business', 'genomics_companies': 'biotech', 'guano_trade': 'business', 'internet_companies': 'internet', 'nb_power': 'energy', 'ice_trade': 'energy', 'petrochemical_companies': 'energy',
@@ -2334,6 +2426,7 @@ def generate_payload(ckm, category_mapping):
 	to_save = {}
 	for k,v in ckm.iteritems():
 		if k in category_mapping:
+			v = [x for x in v if x not in stopwords]
 			to_save[k] = v
 	
 	#now save
