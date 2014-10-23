@@ -7,7 +7,7 @@ const {LWCAClassifier} = require("lwca_refined");
 let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
 scriptLoader.loadSubScript(data.url("test/cnn_docs.js"));
 
-let useWhiteList = true;
+let useWhiteList = false;
 let whiteList = {
   "sports": true,
 };
