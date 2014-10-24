@@ -47,8 +47,9 @@ function LWCAClassifier(){
 			if (verbose) console.log("title before cleaning: " + title)
 			title = removePersistentTitleChunks(url, title, cdb.persistentTitleChunks) //returns a string
 			if (verbose) console.log("removed persistents: " + title)
-			title = getURLChunks(url) + " " + title
-			if (verbose) console.log("added url chunks: " + title)
+			chunks = getURLChunks(url)
+			title = chunks + " " + title
+			if (verbose) console.log("added url chunks: <" + chunks + ">")
 			title = removeDomainNames(url, title) //try to remove domain names
 			if (verbose) console.log("removed domain names: " + title)
 		
@@ -413,7 +414,7 @@ function getURLChunks(url) {
 	url = url.match(wordFinder)
 	
 	useful_words = []
-	for (let word in url) {
+	for (let word of url) {
 		if (word in mozcat_words) {
 			useful_words.push(word)
 		}
