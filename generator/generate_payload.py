@@ -2692,8 +2692,13 @@ def generate_mozcat_words():
 	#remove stopwords
 	words = [x for x in words if x not in stopwords]
 	
+	#now convert to object
+	w_obj = {}
+	for x in words:
+		w_obj[x] = 1
+	
 	with copen('mozcat_words.json', 'w', encoding='utf8') as f:
-		words = dumps(words)
+		words = dumps(w_obj)
 		words = 'mozcat_words = ' + words
 		f.write(words)
 
