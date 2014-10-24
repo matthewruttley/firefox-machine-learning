@@ -412,6 +412,7 @@ function getURLChunks(url) {
 	//url = url.split("?")[0] //eliminate query variables
 	
 	url = url.match(wordFinder)
+	if (verbose) console.log('url chunks found in word finder: ' + url)
 	
 	useful_words = []
 	for (let word of url) {
@@ -419,6 +420,8 @@ function getURLChunks(url) {
 			useful_words.push(word)
 		}
 	}
+	
+	if (verbose) console.log('url chunks left after mozcat_words: ' + useful_words)
 	
 	return useful_words.join(" ")
 }
