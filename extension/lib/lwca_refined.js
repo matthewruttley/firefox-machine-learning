@@ -46,7 +46,6 @@ function LWCAClassifier(){
 			//cleaning
 			if (verbose) console.log("title before cleaning: " + title)
 			title = removePersistentTitleChunks(url, title, cdb.persistentTitleChunks) //returns a string
-			
 			if (verbose) console.log("removed persistents: " + title)
 			chunks = getURLChunks(url)
 			title = chunks + " " + title
@@ -367,10 +366,10 @@ function removePersistentTitleChunks(url, title, cdb){
 	
 	domain = getDomain(url)
 	if (cdb.hasOwnProperty(domain)) {
-		for (let suffix in cdb[domain]) {
+		for (let suffix of cdb[domain]) {
 			if (title.toLowerCase().endsWith(suffix.toLowerCase())) {
 				//chop suffix from end
-				title = title.slice(0, visit[1].length-suffix-length)
+				title = title.slice(0, title.length-suffix.length)
 				break
 			}
 		}
