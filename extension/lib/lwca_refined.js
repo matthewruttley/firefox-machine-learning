@@ -802,9 +802,9 @@ function convertWikiToIAB(results, level="top") {
 		
 		if (top_level != 0) {
 			if (mappings.hasOwnProperty(top_level) == false) {
-				mappings[top_level] = []
+				mappings[top_level] = {}
 			}
-			if (mappings[top_level].indexOf(sub_level) == false) {
+			if (mappings[top_level].hasOwnProperty(sub_level) == false) {
 				mappings[top_level][sub_level] = 0
 			}
 			mappings[top_level][sub_level] += 1
@@ -838,9 +838,16 @@ function convertWikiToIAB(results, level="top") {
 			
 			to_return = [top[0]] //name of the top level
 			
-			//concatenate the different sub level cats
-			sub_levels = Object.keys(mappings[top[0]]).join("/")
+			subs_list = [] //convert to list
+			for (let key in mappings[top[0]]) {subs_list.push([key, mappings[top[0]][key]])}
+			subs_list.sort(sortDescendingBySecondElement)
+			sub_list_names = [] //i wish there were list comprehensions...
+			for(let x of subs_list){
+				sub_list_names.push(x[0])
+			}
 			
+			//concatenate the different sub level cats
+			sub_levels = sub_list_names.join("/")
 			to_return.push(sub_levels)
 			
 			return to_return
