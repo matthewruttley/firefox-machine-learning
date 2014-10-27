@@ -936,29 +936,6 @@ parseUri.options = {
 	}
 };
 
-function longestCommonNgramSuffix(s1, s2){
-	//Does what it says on the tin
-	s1 = s1.split(" ")
-	s2 = s2.split(" ")
-	min_len = s1.length < s2.length ? s1.length : s2.length
-	
-	result = false
-	for (let a=1;a<min_len+1;a++){
-		if (s1[s1.length-a] != s2[s2.length-a]) {
-			result = s1.slice(s1.length-a+1)
-			break
-		}
-	}
-	
-	if (result==false) {
-		return false
-	}else if (result==[]) {
-		return false
-	}else{
-		return result.join(" ")
-	}
-}
-
 String.prototype.endsWith = function(suffix) {
 	//http://stackoverflow.com/a/2548133/849354
     return this.indexOf(suffix, this.length - suffix.length) !== -1;
