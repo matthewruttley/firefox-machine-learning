@@ -193,6 +193,7 @@ function ComponentDatabase(create_objects=true) {
 		
 		//mostly a copy of get_history
 		let options = historyService.getNewQueryOptions(); //make a blank query
+		options.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_DATE_DESCENDING;
 		let query = historyService.getNewQuery();
 		let result = historyService.executeQuery(query, options);
 		let cont = result.root;
@@ -907,6 +908,7 @@ function getHistory(){
 
 	//make a blank query
 	let options = historyService.getNewQueryOptions();
+	options.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_DATE_DESCENDING;
 	let query = historyService.getNewQuery();
 	let result = historyService.executeQuery(query, options);
 
@@ -1086,4 +1088,5 @@ function loadClassifications(){
 }
 
 //for the extension main.js to access
-exports.LWCAClassifier = LWCAClassifier 
+exports.LWCAClassifier = LWCAClassifier
+exports.ComponentDatabase = ComponentDatabase
