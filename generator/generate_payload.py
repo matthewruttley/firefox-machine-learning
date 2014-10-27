@@ -431,8 +431,6 @@ def resolve_mistakes(category_mapping):
 	
 	"""
 	
-	print '1--------------> {0}'.format(category_mapping['journalism_standards'])
-	
 	#first load the heirarchy into memory
 	with open('mozcat_heirarchy.json') as f:
 		tree = load(f)
@@ -444,8 +442,6 @@ def resolve_mistakes(category_mapping):
 		
 		for top_level in tree.iterkeys():
 			tree[top_level] = set(tree[top_level])
-	
-	print '2--------------> {0}'.format(category_mapping['journalism_standards'])
 	
 	#remove things from the taxonomy that we know aren't used
 	sub_cat_remove = set([u'cell phones', u'hotel', u'graduate school', u'local news', u'windows ', u'north_korea', u'greenland', u'sri_lanka', 'greenland'])
@@ -464,8 +460,6 @@ def resolve_mistakes(category_mapping):
 			if x in v:
 				tree[k].remove(x)
 	
-	print '3--------------> {0}'.format(category_mapping['journalism_standards'])
-	
 	#now clean up some of the mappings that contain extra whitespace, upper case, underscores etc
 	cleaned = {}
 	for k,v in category_mapping.iteritems():
@@ -474,10 +468,45 @@ def resolve_mistakes(category_mapping):
 	category_mapping = cleaned
 	cleaned = 0 #free up memory
 	
-	print '4--------------> {0}'.format(category_mapping['journalism_standards'])
+	#delete anything ending in "politicians"
+	pols = [x for x in category_mapping if x.endswith('politicians')]
+	for x in pols:
+		del category_mapping[x]
 	
 	#these are basic corrections:
 	corrections = {
+		u'navigators': 'del',
+		u'spas': 'del',
+		u'time_travel': 'del',
+		u'blowholes': 'del',
+		u'celestial_navigation': 'sailing',
+		u'arctic': 'world',
+		u'amsterdam-zuidoost': 'netherlands',
+		u'maps': 'del',
+		u'valleys': 'del',
+		u'rivers': 'del',
+		u'nordic_countries': 'del', 
+		u'exclaves': 'del',
+		u'mediterranean': 'del',
+		u'scandinavia': 'del',
+		u'interstellar_travel': 'astronomy',
+		u'coral_islands': 'del',
+		u'sahara': 'del',
+		u'alps': 'del',
+		u'kaliningrad_oblast': 'del',
+		u'greco-roman_world': 'del',
+		u'spanish-speaking_countries': 'del',
+		u'berberism': 'del',
+		u'europe': 'del',
+		u'micronations': 'world',
+		u'eurasia': 'del',
+		u'new_islands': 'del',
+		u'balkans': 'del',
+		u'asia': 'del',
+		u'mountain_biking': 'cycling',
+		u'guanche': 'anthropology',
+		u'orientalism': 'anthropology',
+		'wall_street': 'investing',
 		u'telephone_crimes': 'crime',
 		u'families': 'del',
 		u'pool_organizations': 'del',
@@ -1100,8 +1129,6 @@ def resolve_mistakes(category_mapping):
 		u'family': 'family & parenting',
 	}
 	
-	print '5--------------> {0}'.format(category_mapping['journalism_standards'])
-	
 	for old,new in category_corrections.iteritems():
 		#split up v
 		new = new.split('_')
@@ -1134,6 +1161,11 @@ def resolve_mistakes(category_mapping):
 				if category_mapping[wiki] == old:
 					category_mapping[wiki] = sub_cat
 	
+	#move everything that was nested under travel into a new top level called "world"
+	stay_in_travel = [u'cruise vacations', u'adventure', u'budget travel',u'hotels', u'us national parks', u'air travel', u'trains', u'theme parks']
+	world = [x for x in tree['travel'] if x not in stay_in_travel]
+	tree['world'] = world #no need to make them into sets at this point
+	tree['travel'] = stay_in_travel
 	
 	#now check for del or del(_)parent
 	to_delete = set()
@@ -1141,8 +1173,6 @@ def resolve_mistakes(category_mapping):
 	for k,v in category_mapping.iteritems():
 		if v in del_matchers:
 			to_delete.update([k])
-	
-	print '6--------------> {0}'.format(category_mapping['journalism_standards'])
 	
 	for x in to_delete:
 		del category_mapping[x]
@@ -1155,8 +1185,6 @@ def resolve_mistakes(category_mapping):
 	
 	used_cats = set(category_mapping.values())
 	print "Un-used cats: {0}".format([x for x in all_cats if x not in used_cats])
-	
-	print '7--------------> {0}'.format(category_mapping['journalism_standards'])
 	
 	#consider removing travel category
 	
@@ -2691,6 +2719,10 @@ def generate_mozcat_words():
 	
 	#remove stopwords
 	words = [x for x in words if x not in stopwords]
+	
+	#now remove some things which are really not helpful
+	unhelpful = ['search', 'video']
+	words = [x for x in words if x not in unhelpful]
 	
 	#now convert to object
 	w_obj = {}
