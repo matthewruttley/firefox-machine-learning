@@ -16,7 +16,7 @@ const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = true
+var verbose = false
 
 function LWCAClassifier(){
 	// Main handler class
@@ -85,7 +85,7 @@ function LWCAClassifier(){
 			//remove any scores with a similarity of less than 0.3
 			scores_filtered = []
 			for (let s of scores) {
-				if (s[1] >= 0.3) {
+				if (s[1] >= 0.25) {
 					scores_filtered.push(s)
 				}
 			}
@@ -101,7 +101,7 @@ function LWCAClassifier(){
 		
 		//finish up
 			if (verbose) console.log("Finishing up")
-			return scores[0]
+			return scores
 		
 	}
 
@@ -773,66 +773,51 @@ function augmentQueries(url, results, queryDatabase) {
 
 function convertWikiToIAB(results, level="top") {
 	//converts a set of wiki categories to IAB categories
-	//options for level are:
-	// - top, all
-	
-	new_results = []
-	
-	for (let r of results) {
-		let cat = r[0].toLowerCase()
-		if (new_mappings.hasOwnProperty(cat)) {
-			new_results.push([new_mappings[cat], r[1]])
-		}else{
-			if (verbose) console.log("wiki category: <" + cat + "> was not found in new_mappings.json")
-		}
-	}
 	
 	let counts = {}
-	if (level==='top') {
-		//bring everything to the top level
-		for (let result of results) { //get frequencies per top level
-			let wiki_cat_name = result[0].toLowerCase()
-			let iab_mapping = new_mappings[wiki_cat_name]
-			if (verbose) console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
-			
-			top_level = 0
-			
-			//could be top level
-			if (tree.hasOwnProperty(iab_mapping)){
-				top_level = iab_mapping
-			}else{
-				for (let tlcat in tree) {
-					if (tree[tlcat].indexOf(iab_mapping) != -1) {
-						top_level = tlcat
-						break
-					}
-				}
-			}
-			
-			if (top_level != 0) {
-				if (counts.hasOwnProperty(top_level) == false) {
-					counts[top_level] = 1
-				}else{
-					counts[top_level] += 1
+	
+	let mappings = {}
+	
+	for (let result of results) { //get frequencies per top level
+		let wiki_cat_name = result[0].toLowerCase()
+		let iab_mapping = new_mappings[wiki_cat_name]
+		if (verbose) console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
+		
+		top_level = 0
+		sub_level = 0
+		
+		//is the IAB mapping already top level?
+		if (tree.hasOwnProperty(iab_mapping)){
+			top_level = iab_mapping
+			sub_level = "general"
+		}else{
+			for (let tlcat in tree) {
+				if (tree[tlcat].indexOf(iab_mapping) != -1) {
+					top_level = tlcat
+					sub_level = iab_mapping
 				}
 			}
 		}
-	}else{
-		for (let result of results) { //return the best of all levels
-			let wiki_cat_name = result[0].toLowerCase() //bit too much code repetition here
-			let iab_mapping = new_mappings[wiki_cat_name]
-			if (verbose) console.log('checking wiki: ' + wiki_cat_name + ' which has IAB mapping: ' + iab_mapping)
-			if (iab_mapping != undefined) {
-				if (counts.hasOwnProperty(iab_mapping)) {
-					counts[iab_mapping] = 1
-				}else{
-					counts[iab_mapping] += 1
-				}
+		
+		if (top_level != 0) {
+			if (mappings.hasOwnProperty(top_level) == false) {
+				mappings[top_level] = []
+			}
+			if (mappings[top_level].indexOf(sub_level) == false) {
+				mappings[top_level][sub_level] = 0
+			}
+			mappings[top_level][sub_level] += 1
+			
+			if (counts.hasOwnProperty(top_level) == false) {
+				counts[top_level] = 1
+			}else{
+				counts[top_level] += 1
 			}
 		}
 	}
 	
 	if (verbose) console.log('counts: ' + JSON.stringify(counts))
+	if (verbose) console.log('mapping counts: ' + JSON.stringify(mappings))
 	
 	//if there's nothing
 	if (Object.keys(counts).length == 0) {
@@ -849,7 +834,15 @@ function convertWikiToIAB(results, level="top") {
 	//check if the match is strong enough
 	if (top[1] >= 0.3*total) { //at least 30% of the matches
 		if (top[1] > 1) { //as long as its not just 3 all with a score of 1
-			return [top[0]]
+			
+			to_return = [top[0]] //name of the top level
+			
+			//concatenate the different sub level cats
+			sub_levels = Object.keys(mappings[top[0]]).join("/")
+			
+			to_return.push(sub_levels)
+			
+			return to_return
 		}else{
 			return ['uncategorized']
 		}
