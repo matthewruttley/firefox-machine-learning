@@ -16,7 +16,7 @@ const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = true
+var verbose = false
 
 function LWCAClassifier(){
 	// Main handler class
@@ -65,7 +65,7 @@ function LWCAClassifier(){
 			if (verbose) console.log("scores: " + scores)
 			
 			if (scores.length == 0) {
-				return "Sorry, currently uncategorizable"
+				return "uncategorized"
 			}
 		
 		//post process
@@ -81,6 +81,16 @@ function LWCAClassifier(){
 			//if that didn't change anything, last resort is using queries and repeats
 			if (verbose) console.log("trying query augmentation")
 			scores = augmentQueries(url, scores, cdb.queryVariables)
+			
+			//remove any scores with a similarity of less than 0.3
+			scores_filtered = []
+			for (let s of scores) {
+				if (s[1] >= 0.3) {
+					scores_filtered.push(s)
+				}
+			}
+			scores = scores_filtered
+			
 			if (verbose) console.log('scores: ' + scores)
 			//console.log("trying repeat word augmentation")
 			//scores = augmentRepeatWords(scores)
@@ -91,7 +101,7 @@ function LWCAClassifier(){
 		
 		//finish up
 			if (verbose) console.log("Finishing up")
-			return scores.sort(sortDescendingBySecondElement)[0]
+			return scores[0]
 		
 	}
 
@@ -824,29 +834,45 @@ function convertWikiToIAB(results, level="top") {
 	
 	if (verbose) console.log('counts: ' + JSON.stringify(counts))
 	
-	//get top 2
+	//if there's nothing
+	if (Object.keys(counts).length == 0) {
+		return ['uncategorized']
+	}
+	
+	//get top item
 	counts_list = []
-	for (let key in counts) {counts_list.push([key, counts[key]])} //convert to list
+	total = 0
+	for (let key in counts) {counts_list.push([key, counts[key]]);total+=counts[key]} //convert to list
 	counts_list.sort(sortDescendingBySecondElement)
+	top = counts_list[0]
 	
-	//messy error handling
-	if (counts_list.length == 0) {
-		return ['Sorry, currently uncategorizable']
-	}
-	
-	//if the top two are the same, then return the category that is associated with
-	//otherwise just return #1
-	if (counts_list.length == 1) {
-		return [counts_list[0][0]]
+	//check if the match is strong enough
+	if (top[1] >= 0.3*total) {
+		return [top[0]]
 	}else{
-		if (counts_list[0][0] === counts_list[1][0]) {
-			//return the iab of #1
-			return [new_mappings[results[0][0].toLowerCase()]]
-		}else{
-			//return the top one of those
-			return [counts_list[0][0]]
-		}
+		return ['uncategorized']
 	}
+	
+	//which one 
+	
+	////messy error handling
+	//if (counts_list.length == 0) {
+	//	return ['Uncategorized']
+	//}
+	//
+	////if the top two are the same, then return the category that is associated with
+	////otherwise just return #1
+	//if (counts_list.length == 1) {
+	//	return [counts_list[0][0]]
+	//}else{
+	//	if (counts_list[0][0] === counts_list[1][0]) {
+	//		//return the iab of #1
+	//		return [new_mappings[results[0][0].toLowerCase()]]
+	//	}else{
+	//		//return the top one of those
+	//		return [counts_list[0][0]]
+	//	}
+	//}
 }
 
 // Auxiliary functions, matchers, options etc
