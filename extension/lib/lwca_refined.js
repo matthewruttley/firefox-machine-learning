@@ -16,7 +16,7 @@ const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = false
+var verbose = true
 
 function LWCAClassifier(){
 	// Main handler class
@@ -847,8 +847,12 @@ function convertWikiToIAB(results, level="top") {
 	top = counts_list[0]
 	
 	//check if the match is strong enough
-	if (top[1] >= 0.3*total) {
-		return [top[0]]
+	if (top[1] >= 0.3*total) { //at least 30% of the matches
+		if (top[1] > 1) { //as long as its not just 3 all with a score of 1
+			return [top[0]]
+		}else{
+			return ['uncategorized']
+		}
 	}else{
 		return ['uncategorized']
 	}
