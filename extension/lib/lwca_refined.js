@@ -18,13 +18,13 @@ Cu.import("resource://gre/modules/Task.jsm");
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
 var verbose = false
 
-function LWCAClassifier(){
+function LWCAClassifier(worker, callback){
 	// Main handler class
 	
 	//Initialize various processors
 	if (verbose) console.log("Initializing...")
 	
-	let cdb = new ComponentDatabase() //objects that help match title components and query variables
+	let cdb = new ComponentDatabase(worker, callback); //objects that help match title components and query variables
 	//it also checks if it needs to be updated etc
 	
 	let ce = new ClassificationEngine()
@@ -131,10 +131,15 @@ function spotDefinites(url, title){
 	return false //false if nothing found
 }
 
-function ComponentDatabase(create_objects=true) {
+function ComponentDatabase(worker, callback, create_objects=true) {
 	//creates a database of known query variables and persistent title components
 	
 	//initialization
+    this._worker = worker;
+    this._worker.addEventListener("message", this, false);
+    this._worker.addEventListener("error", this, false);
+    this._callback = callback; // For when worker is done processing.
+
 	this.queryVariables = {}
 	this.persistentTitleChunks = {}
 	this.meta = {'timestamp':0}
@@ -145,47 +150,16 @@ function ComponentDatabase(create_objects=true) {
 		if (ts['start'] == 0) {
 			//nothing ever made before
 			if (verbose) console.log('Nothing found in local directory, so scanning the whole history')
-			let cdb = this.scan(ts['start'], ts['end'])
-			this.queryVariables = cdb['queryVariables']
-			this.persistentTitleChunks = cdb['persistentTitleChunks']
+			this.scan(ts['start'], ts['end']);
 		}else{
 			//something made before, so load it
 			if (verbose) console.log('Found cdb in local directory, importing')
 			yield this.load_component_database();
 			
 			//fill in the rest
-			let cdb = this.scan(ts['start'], ts['end'])
-			
-			//then merge the new stuff with the old stuff
-			//first query variables
-			for (let domain in cdb['queryVariables']) {
-				//python equivalent of this.queryVariables[domain][v] == 1
-				if (this.queryVariables.hasOwnProperty(domain) == false) {
-					this.queryVariables[domain] = {}
-				}
-				console.log('qv domain on 152: ' + JSON.stringify(cdb['queryVariables'][domain]))
-				for (let v in cdb['queryVariables'][domain]) {
-					if (this.queryVariables[domain].hasOwnProperty(v) == false) {
-						this.queryVariables[domain][v] = 1
-					}
-				}
-			}
-			
-			//then title components
-			for (let domain in cdb['persistentTitleChunks']) {
-				if (this.persistentTitleChunks.hasOwnProperty(domain) == false) {
-					this.persistentTitleChunks[domain] = {}
-				}
-				console.log('v domain on 165: ' + JSON.stringify(cdb['persistentTitleChunks'][domain]))
-				for (let v of cdb['persistentTitleChunks'][domain]) {
-					if (this.persistentTitleChunks[domain].hasOwnProperty(v) == false) {
-						this.persistentTitleChunks[domain][v] = 1
-					}
-				}
-			}
+			this.scan(ts['start'], ts['end']);
 			if (verbose) console.log('loaded existing cdb from disc')
 		}
-		this.save() //now save everything
 	}.bind(this));};
 	
 	this.find_start_and_end = function() {return Task.spawn(function*() {
@@ -211,103 +185,106 @@ function ComponentDatabase(create_objects=true) {
 			return {'start': this.meta['timestamp'], 'end':latest_timestamp} //start and ending timestamps of whatever needs to be updated
 		}
 	}.bind(this));};
+
+	this._handleVisitProcessComplete = function(msgData) {
+        this._qv = msgData.qv;
+        this._domain_titles = msgData.domain_titles;
+        this.meta['timestamp'] = msgData.timestamp;
+        this._processNextHistoryEvent();
+        this._msgReceivedCount++;
+    };
+
+    this._handleComputedPTC = function(msgData) {
+        let ptc = msgData.ptc;
+
+        if (this._start != 0) {
+            //merge the new stuff with the old stuff
+            //first query variables
+            for (let domain in this._qv) {
+                if (this.queryVariables.hasOwnProperty(domain) == false) {
+                    this.queryVariables[domain] = {}
+                }
+                for (let v of this._qv[domain]) {
+                    if (this.queryVariables[domain].hasOwnProperty(v) == false) {
+                        this.queryVariables[domain][v] = 1
+                    }
+                }
+            }
+
+            //then title components
+            for (let domain in ptc) {
+                if (this.persistentTitleChunks.hasOwnProperty(domain) == false) {
+                    this.persistentTitleChunks[domain] = {}
+                }
+                for (let v of ptc[domain]) {
+                    if (this.persistentTitleChunks[domain].hasOwnProperty(v) == false) {
+                        this.persistentTitleChunks[domain][v] = 1
+                    }
+                }
+            }
+            if (verbose) console.log('loaded existing cdb from disc')
+        } else {
+            this.queryVariables = this._qv;
+            this.persistentTitleChunks = ptc;
+        }
+        this._callback();
+        this.save() //now save everything
+  };
+
+    this.handleEvent = function(aEvent) {
+        let eventType = aEvent.type;
+        if (eventType == "message") {
+            let msgData = aEvent.data;
+            if (msgData.message == "visitProcessComplete") {
+                this._handleVisitProcessComplete(msgData);
+            } else if (msgData.message == "computedPTC") {
+                this._handleComputedPTC(msgData);
+            }
+        } else if (eventType == "error") {
+            //TODO:handle error
+            console.log(aEvent.message);
+        }
+    };
+
+    this._processNextHistoryEvent = function() {
+        try {
+            let nextVisit = this._history.next();
+            this._history_total += 1;
+
+            this._worker.postMessage({
+                command: "processHistoryEntry",
+                payload: {
+                    "visit": nextVisit,
+                    "timestamp": this.meta['timestamp'],
+                    "start": this._start,
+                    "end": this._end,
+                    "domain_titles": this._domain_titles,
+                    "qv": this._qv
+                }
+            });
+        } catch (ex if ex instanceof StopIteration) {
+            if (verbose) console.log("Total history items loaded: " + this._history_total);
+            if (verbose) console.log("Finding common suffixes in " + Object.keys(this._domain_titles).length + " domains ");
+
+            this._worker.postMessage({
+                command: "computePTC",
+                payload: {
+                    "domain_titles": this._domain_titles
+                }
+            });
+        }
+    };
 	
 	this.scan = function(start, end){
-		let history = getHistory()
-		//try and do the two together
-		//arrange visits by domain
-		
-		let qv = {} //query variables
-		let ptc = {} //persistent title components
-		let domain_titles = {}
-		
-		history_total = 0
-		for (let visit of history){
-			if ((visit[2]>=start) && (visit[2]<=end)) {
-				url = visit[0]
-				url = parseUri(url)
-				let domain = url.host
-				
-				//scan components
-				for (let var_name in url.queryKey) {
-					if (spaceFinder.test(url.queryKey[var_name])) {
-						//Note: the following spaghetti is why you use a decent language like python
-						//with sets/defaultdicts
-						if (qv.hasOwnProperty(domain) == false) {
-							qv[domain] = {}
-						}
-						if (qv[domain].hasOwnProperty(var_name) == false) {
-							qv[domain][var_name] = 0
-						}
-						qv[domain][var_name] += 1
-					}
-				}
-				
-				//sort title
-				if (domain_titles.hasOwnProperty(domain)==false) {
-					domain_titles[domain] = []
-				}
-				
-				if (visit[1] != null) {
-					domain_titles[domain].push(visit[1])
-				}
-				history_total += 1
-			}
-			if (visit[2] > this.meta['timestamp']) {
-				this.meta['timestamp'] = visit[2] //timestamp is now last item loaded
-			}
-		}
-		
-		if (verbose) console.log("Total history items loaded: " + history_total)
-		
-		if (verbose) console.log("Finding common suffixes in " + Object.keys(domain_titles).length + " domains ")
-		//what are the most common suffixes?
-		
-		//first some sort of stats
-		total_domains = Object.keys(domain_titles).length
-		count = 0
-		increment = total_domains / 100 //TODO
-		
-		//now for processing
-		for (let domain in domain_titles){
-			let suffixes = {}
-			let titles = domain_titles[domain]
-			for (let x=0;x<titles.length;x++){
-				for (let y=x+1;y<titles.length;y++){
-					if (titles[x]!=titles[y]) {
-						let lcns = longestCommonNgramSuffix(titles[x], titles[y])
-						if (lcns!=false) {
-							if (suffixes.hasOwnProperty(lcns) == false) {
-								suffixes[lcns] = 0
-							}
-							suffixes[lcns] += 1
-						}
-					}
-					
-				}
-			}
-			//eliminate those that only appear once 
-			let to_add = []
-			for (let suffix in suffixes) {
-				let count = suffixes[suffix]
-				if (count > 1) {
-					to_add.push(suffix)
-				}
-			}
-			//to_add must be sorted in descending order of length
-			//as largest matches should be eliminated first
-			to_add = to_add.sort(sortDescendingByElementLength)
-			ptc[domain] = to_add
-		}
-		
-		//now remove anything empty
-		to_delete = []
-		for (let x in ptc) {if (ptc[x].length == 0) {to_delete.push(x)}}
-		for (let x of to_delete){delete ptc[x]}
-		
-		//return
-		if (verbose) console.log('Done!')
-		return {'persistentTitleChunks':ptc, 'queryVariables':qv}
+        this._history = getHistory();
+        this._history_total = 0;
+        this._start = start;
+        this._end = end;
+        this._qv = {}; //query variables
+        this._ptc = {}; //persistent title components
+        this._domain_titles = {};
+        this._msgReceivedCount = 0;
+        this._processNextHistoryEvent(start, end);
 	}
 	
 	this.load_meta = function() {return Task.spawn(function*() {
@@ -965,29 +942,6 @@ parseUri.options = {
 		loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
 	}
 };
-
-function longestCommonNgramSuffix(s1, s2){
-	//Does what it says on the tin
-	s1 = s1.split(" ")
-	s2 = s2.split(" ")
-	min_len = s1.length < s2.length ? s1.length : s2.length
-	
-	result = false
-	for (let a=1;a<min_len+1;a++){
-		if (s1[s1.length-a] != s2[s2.length-a]) {
-			result = s1.slice(s1.length-a+1)
-			break
-		}
-	}
-	
-	if (result==false) {
-		return false
-	}else if (result==[]) {
-		return false
-	}else{
-		return result.join(" ")
-	}
-}
 
 String.prototype.endsWith = function(suffix) {
 	//http://stackoverflow.com/a/2548133/849354

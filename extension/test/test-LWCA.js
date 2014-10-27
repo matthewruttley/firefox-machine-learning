@@ -105,25 +105,29 @@ function procTestSet(testSet, name, ftLen=20) {
 
 let classifier = null;
 
-function initClassifier() {
-  if (classifier == null) {
-    dump("Loading LWCA...\n");
-    classifier = new LWCAClassifier();
-    return classifier.init().then(() => {
-      dump("Finished loading LWCA\n");
-    });
-  }
+function initClassifier(callback) {
+  dump("Loading LWCA...\n");
+  let worker = new ChromeWorker(data.url("lwcaWorker.js"));
+  classifier = new LWCAClassifier(worker, callback);
+  return classifier.init().then(() => {
+    dump("Finished loading LWCA\n");
+  });
   return Promise.resolve();
 }
 
 exports["test CNN"] =
 function test_CNN(assert, done) {
-  Task.spawn(function() {
-    try {
-      yield initClassifier();
+  let callback = function() {
+    Task.spawn(function*() {
       procTestSet(cnnTest, "CNN PATH SELECTED DOCS");
       assert.ok(true);
       done();
+    });
+  };
+
+  Task.spawn(function() {
+    try {
+      initClassifier(callback);
     } catch (ex) {
       dump(ex + " ERROR");
       done();
@@ -133,12 +137,17 @@ function test_CNN(assert, done) {
 
 exports["test EDRULES"] =
 function test_EDRULES(assert, done) {
-  Task.spawn(function() {
-    try {
-      yield initClassifier();
+  let callback = function() {
+    Task.spawn(function*() {
       procTestSet(edRules, "EDRULES DOCS");
       assert.ok(true);
       done();
+    });
+  };
+
+  Task.spawn(function() {
+    try {
+      initClassifier(callback);
     } catch (ex) {
       dump(ex + " ERROR");
       done();
@@ -154,12 +163,17 @@ function test_SingleDoc(assert, done) {
   "CNN's Human to Hero series celebrates inspiration and achievement in sport. Click here for times, videos and features \n\n(CNN) -- Ask anyone from the U.S. to name a famous swimmer and they will probably say Michael Phelps. But put the same question to someone in Japan and the name that trips off the tongue is Kosuke Kitajima.\n\nThe 32-year-old has propelled not only himself but Japanese swimming into the spotlight in the 21st century thanks to a series of remarkable performances on the global stage, smashing records and scooping multiple world and Olympic titles.\n\nHis best days in the pool may be behind him but Kitajima's focus remains forward-looking as he builds on his legacy as arguably the greatest breaststroke exponent of all time.\n\nHis goal is to inspire the next generation of champions from the Far East ahead of Tokyo's 2020 hosting of the world's biggest sporting showpiece by getting them started in the pool.\n\n\"I want children to start swimming and have lots of dreams in swimming"
   ];
 
+  let callback = function() {
+    Task.spawn(function*() {
+      let results = testVisit(testDoc, true);
+      dump(testDoc[1] + " => " + "title: " + results[0] + ", fulltext: " + results[1]);
+      assert.ok(true);
+      done();
+    });
+  };
+
   Task.spawn(function() {
-    yield initClassifier();
-    let results = testVisit(testDoc, true);
-    dump(testDoc[1] + " => " + "title: " + results[0] + ", fulltext: " + results[1]);
-    assert.ok(true);
-    done();
+    initClassifier(callback);
   });
 }
 
