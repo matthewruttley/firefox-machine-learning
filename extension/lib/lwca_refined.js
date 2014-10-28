@@ -16,7 +16,7 @@ const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = true
+var verbose = false
 
 function LWCAClassifier(){
 	// Main handler class
@@ -27,7 +27,7 @@ function LWCAClassifier(){
 	let cdb = new ComponentDatabase() //objects that help match title components and query variables
 	//it also checks if it needs to be updated etc
 	
-	let ce = new ClassificationEngine()
+	let ce = new ClassificationEngine(world=false) // set this flag to "true" if you want titles with countries to be matched (see function for more details)
 	
 	//Handle requests
 	this.classify = function(url, title){
@@ -478,20 +478,26 @@ function cosineSimilarity(text, category_keywords, category_magnitude){
 	return 0
 }
 
-function ClassificationEngine(){
-	//a class that can classify a visit 
+function ClassificationEngine(world=false){
+	//a class that can classify a visit
+	//There's one option, a flag called "world". Basically there are lots of titles where the only useful
+	//thing that can be matched to is the fact that it contains "china" or "argentina". These fall into the
+	// <world> top level category in the tree. They will be later used for plotting things on a map, but at the
+	//moment I think we can sacrifice some recall for the higher precision that this will attain. 
 	
-	//initializer
-	
+	//initializer and world remover
 	let categories = []
-	for(let k of Object.keys(payload)){
-		if (Object.keys(payload[k]).length >= 25) { //pruning
-			categories.push(k)
+	if (world === true) {
+		categories = Object.keys(new_mappings)
+	}else{
+		for (let k of Object.keys(new_mappings)){
+			if (tree['world'].indexOf(new_mappings[k]) == -1) {
+				categories.push(k)
+			}
 		}
 	}
 	
-	//possible further pruning
-	// - must contain a unique key
+	if (verbose) console.log('<world> is set to ' + world + " and the inverse index will use " + categories.length + " categories out of " + Object.keys(new_mappings).length + " total")
 	
 	//build inverse index and magnitudes
 	this.id_to_article = {}
@@ -792,9 +798,6 @@ function convertWikiToIAB(results, level="top") {
 			sub_level = "general"
 		}else{
 			for (let tlcat of Object.keys(tree)) {
-				if (tlcat == 'world') {
-					console.log(tree[tlcat])
-				}
 				if (tree[tlcat].indexOf(iab_mapping) != -1) {
 					top_level = tlcat
 					sub_level = iab_mapping
