@@ -16,7 +16,7 @@ const {Cc, Ci, Cu, ChromeWorker} = require("chrome");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var preprocessingProgressPercent = 0 //global variable to indicate how far in the pre processing the user is
-var verbose = false
+var verbose = true
 
 function LWCAClassifier(){
 	// Main handler class
@@ -776,7 +776,6 @@ function convertWikiToIAB(results, level="top") {
 	//converts a set of wiki categories to IAB categories
 	
 	let counts = {}
-	
 	let mappings = {}
 	
 	for (let result of results) { //get frequencies per top level
@@ -792,13 +791,18 @@ function convertWikiToIAB(results, level="top") {
 			top_level = iab_mapping
 			sub_level = "general"
 		}else{
-			for (let tlcat in tree) {
+			for (let tlcat of Object.keys(tree)) {
+				if (tlcat == 'world') {
+					console.log(tree[tlcat])
+				}
 				if (tree[tlcat].indexOf(iab_mapping) != -1) {
 					top_level = tlcat
 					sub_level = iab_mapping
 				}
 			}
 		}
+		
+		if (verbose) console.log('TL: ' + top_level + " SL: " + sub_level)
 		
 		if (top_level != 0) {
 			if (mappings.hasOwnProperty(top_level) == false) {
@@ -857,27 +861,6 @@ function convertWikiToIAB(results, level="top") {
 	}else{
 		return ['uncategorized']
 	}
-	
-	//which one 
-	
-	////messy error handling
-	//if (counts_list.length == 0) {
-	//	return ['Uncategorized']
-	//}
-	//
-	////if the top two are the same, then return the category that is associated with
-	////otherwise just return #1
-	//if (counts_list.length == 1) {
-	//	return [counts_list[0][0]]
-	//}else{
-	//	if (counts_list[0][0] === counts_list[1][0]) {
-	//		//return the iab of #1
-	//		return [new_mappings[results[0][0].toLowerCase()]]
-	//	}else{
-	//		//return the top one of those
-	//		return [counts_list[0][0]]
-	//	}
-	//}
 }
 
 // Auxiliary functions, matchers, options etc
