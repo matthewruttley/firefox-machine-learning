@@ -65,7 +65,7 @@ function LWCAClassifier(worker, callback){
 			if (verbose) console.log("scores: " + scores)
 			
 			if (scores.length == 0) {
-				return "uncategorized"
+				return ["uncategorized"]
 			}
 		
 		//post process
