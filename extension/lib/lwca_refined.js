@@ -124,7 +124,7 @@ function spotDefinites(url, title){
 	
 	for (let definiteMatch in definites) {
 		if (title.indexOf(definiteMatch) != -1) {
-			return definites[definiteMatch]
+			return [definites[definiteMatch], 'general']
 		}
 	}
 	
