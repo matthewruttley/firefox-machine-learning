@@ -204,7 +204,7 @@ function ComponentDatabase(worker, callback, create_objects=true) {
                 if (this.queryVariables.hasOwnProperty(domain) == false) {
                     this.queryVariables[domain] = {}
                 }
-                for (let v of this._qv[domain]) {
+                for (let v in this._qv[domain]) {
                     if (this.queryVariables[domain].hasOwnProperty(v) == false) {
                         this.queryVariables[domain][v] = 1
                     }
