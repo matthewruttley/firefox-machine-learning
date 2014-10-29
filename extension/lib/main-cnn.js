@@ -3581,49 +3581,79 @@ exports.main = function(options, callbacks) {
 		for (let category in cnnTest) { //iterate through each cnn category (business, health etc)
 			
 			expectedCat = cnnTest[category]['expectedCat'] //stats containers
-			correct = 0
-			incorrect = 0
-			uncategorized = 0
-			incorrect_counts = {}
+			//console.log('processing cat: ' + expectedCat)
+			
+			//stats only using url+title
+			correct_title = 0
+			incorrect_title = 0
+			uncategorized_title = 0
+			incorrect_counts_title = {}
+			
+			//stats using url+title+text
+			correct_both = 0
+			incorrect_both = 0
+			uncategorized_both = 0
+			incorrect_counts_both = {}
 			
 			for (let visitGroup of cnnTest[category]['visits']) { //iterate through each visit in the category
 				url = visitGroup[0]
 				title = visitGroup[1]
-				decision = c.classify(url, title)
-				top_level = decision[0]
+				text = visitGroup[2]
 				
+				//process url+title matches
+				title_decision = c.classify(url, title)
+				top_level = title_decision[0]
+				//console.log('url+title got: ' + top_level)
 				
 				if (top_level == expectedCat) { //if correct
-					correct += 1
+					correct_title += 1
 				}else{
 					if (top_level == 'uncategorized') { // if uncategorized
-						uncategorized += 1
+						uncategorized_title += 1
 					}else{
-						incorrect += 1 //if incorrect
-						if (incorrect_counts.hasOwnProperty(top_level) == false) { //need stats about incorrect items
-							incorrect_counts[top_level] = 1
+						incorrect_title += 1 //if incorrect
+						if (incorrect_counts_title.hasOwnProperty(top_level) == false) { //need stats about incorrect items
+							incorrect_counts_title[top_level] = 1
 						}else{
-							incorrect_counts[top_level] += 1
+							incorrect_counts_title[top_level] += 1
 						}
 					}
 				}
+				
+				//now process url+title+text
+				both_decision = c.classify(url, title+" "+text)
+				top_level = both_decision[0]
+				//console.log('url+title+text got: ' + top_level)
+				
+				if (top_level == expectedCat) { //if correct
+					correct_both += 1
+				}else{
+					if (top_level == 'uncategorized') { // if uncategorized
+						uncategorized_both += 1
+					}else{
+						incorrect_both += 1 //if incorrect
+						if (incorrect_counts_both.hasOwnProperty(top_level) == false) { //need stats about incorrect items
+							incorrect_counts_both[top_level] = 1
+						}else{
+							incorrect_counts_both[top_level] += 1
+						}
+					}
+				}
+				
 			}
 			
-			//now convert the incorrect items to a list sorted descending
-			incorrect_list = []; for (let k of Object.keys(incorrect_counts)) {incorrect_list.push([k, incorrect_counts[k]])}
-			incorrect_list = incorrect_list.sort(sortDescBy2ndElem) //sort
+			//now convert both incorrect counters to a list sorted descending
+			incorrect_list_title = []; for (let k of Object.keys(incorrect_counts_title)) {incorrect_list_title.push([k, incorrect_counts_title[k]])}
+			incorrect_list_title = incorrect_list_title.sort(sortDescBy2ndElem) //sort
+			
+			incorrect_list_both = []; for (let k of Object.keys(incorrect_counts_both)) {incorrect_list_both.push([k, incorrect_counts_both[k]])}
+			incorrect_list_both = incorrect_list_both.sort(sortDescBy2ndElem) //sort
 			
 			//now output some stats
-			total = cnnTest[category]['visits'].length
-			result = [
-						expectedCat,	//category
-						correct,		//how many correctly classified
-						incorrect,		//how many incorrectly classified
-						uncategorized,	//how many uncategorized
-						incorrect_list	//a list of the incorrectly classified item's classifications
-					]
-			
-			console.log(expectedCat+(Array(25-expectedCat.length).join(" "))+ correct +"\t"+ incorrect +"\t"+ uncategorized +"\t"+ incorrect_list)
+			console.log('(title+url)')
+			console.log(expectedCat+(Array(25-expectedCat.length).join(" "))+ correct_title +"\t"+ incorrect_title +"\t"+ uncategorized_title +"\t"+ incorrect_list_title)
+			console.log('(title+url+text)')
+			console.log(expectedCat+(Array(25-expectedCat.length).join(" "))+ correct_both +"\t"+ incorrect_both +"\t"+ uncategorized_both +"\t"+ incorrect_list_both)
 		}	
 		
 	};
