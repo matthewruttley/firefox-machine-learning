@@ -65,7 +65,7 @@ function LWCAClassifier(worker, callback){
 			if (verbose) console.log("scores: " + scores)
 			
 			if (scores.length == 0) {
-				return ["uncategorized"]
+				return ['uncategorized', 'dummy']
 			}
 		
 		//post process
@@ -806,7 +806,7 @@ function convertWikiToIAB(results, level="top") {
 	
 	//if there's nothing
 	if (Object.keys(counts).length == 0) {
-		return ['uncategorized']
+		return ['uncategorized', 'dummy']
 	}
 	
 	//get top item
@@ -836,10 +836,10 @@ function convertWikiToIAB(results, level="top") {
 			
 			return to_return
 		}else{
-			return ['uncategorized']
+			return ['uncategorized', 'dummy']
 		}
 	}else{
-		return ['uncategorized']
+		return ['uncategorized', 'dummy']
 	}
 }
 
