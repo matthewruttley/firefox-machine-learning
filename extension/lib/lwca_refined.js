@@ -27,7 +27,7 @@ function LWCAClassifier(worker, callback) {
 	let cdb = new ComponentDatabase(worker, callback); //objects that help match title components and query variables
 	//it also checks if it needs to be updated etc
 
-	let ce = new ClassificationEngine(world = false) // set this flag to "true" if you want titles with countries to be matched (see function for more details)
+	let ce = new ClassificationEngine(false) // set this flag to "true" if you want titles with countries to be matched (see function for more details)
 
 	//Handle requests
 	this.classify = function(url, title) {
@@ -47,7 +47,7 @@ function LWCAClassifier(worker, callback) {
 		if (verbose) console.log("title before cleaning: " + title)
 		title = removePersistentTitleChunks(url, title, cdb.persistentTitleChunks) //returns a string
 		if (verbose) console.log("removed persistents: " + title)
-		chunks = getURLChunks(url)
+		let chunks = getURLChunks(url)
 		title = chunks + " " + title
 		if (verbose) console.log("added url chunks: <" + chunks + ">")
 		title = removeDomainNames(url, title) //try to remove domain names
@@ -83,7 +83,7 @@ function LWCAClassifier(worker, callback) {
 		scores = augmentQueries(url, scores, cdb.queryVariables)
 
 		//remove any scores with a similarity of less than 0.3
-		scores_filtered = []
+		let scores_filtered = []
 		for (let s of scores) {
 			if (s[1] >= 0.25) {
 				scores_filtered.push(s)
@@ -103,6 +103,14 @@ function LWCAClassifier(worker, callback) {
 		if (verbose) console.log("Finishing up")
 		return scores
 
+	}
+
+	this.setHistoryProgressCallback = function(callback) {
+		cdb.setHistoryProgressCallback(callback);
+	}
+
+	this.setTitleProgressCallback = function(callback) {
+		cdb.setTitleProgressCallback(callback);
 	}
 
 	this.init = function() {
@@ -167,6 +175,14 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 		}.bind(this));
 	};
 
+	this.setHistoryProgressCallback = function(callback) {
+		this._historyProgressCallback = callback;
+	}
+
+	this.setTitleProgressCallback = function(callback) {
+		this._titleProgressCallback = callback;
+	}
+
 	this.find_start_and_end = function() {
 		return Task.spawn(function*() {
 			//where to start and end the scanning (if any)
@@ -178,12 +194,11 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 			let result = historyService.executeQuery(query, options);
 			let cont = result.root;
 			cont.containerOpen = true;
-			latest_timestamp = cont.getChild(0).time //this is the last url that the user visited, which is the 'end'
+			let latest_timestamp = cont.getChild(0).time; //this is the last url that the user visited, which is the 'end'
 			cont.containerOpen = false;
 
 
-			lm =
-				yield this.load_meta(); //find last url visited's id
+			let lm = yield this.load_meta(); //find last url visited's id
 			if (lm == false) {
 				if (verbose) console.log('Could not find any meta information. Everything needs to be scanned. Please create a component database first')
 				return {
@@ -202,11 +217,27 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 
 	this._handleVisitProcessComplete = function(msgData) {
 		this._qv = msgData.qv;
-		this._domain_titles = msgData.domain_titles;
+		for (let domain in msgData.domain_titles) {
+			//sort title
+			if (this._domain_titles.hasOwnProperty(domain) == false) {
+				this._domain_titles[domain] = []
+			}
+			this._totalTitles += msgData.domain_titles[domain].length;
+			this._domain_titles[domain] = this._domain_titles[domain].concat(msgData.domain_titles[domain]);
+		}
+
 		this.meta['timestamp'] = msgData.timestamp;
 		this._processNextHistoryEvent();
-		this._msgReceivedCount++;
+		if (this._historyProgressCallback) {
+			this._historyProgressCallback("historyProgress", this._history_total, msgData.totalEntries);
+		}
 	};
+
+	this._handleAnalyzedTitle = function(msgData) {
+		if (this._titleProgressCallback) {
+			this._titleProgressCallback("titleProgress", msgData.domainCount, this._totalTitles);
+		}
+	}
 
 	this._handleComputedPTC = function(msgData) {
 		let ptc = msgData.ptc;
@@ -249,10 +280,16 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 		let eventType = aEvent.type;
 		if (eventType == "message") {
 			let msgData = aEvent.data;
-			if (msgData.message == "visitProcessComplete") {
-				this._handleVisitProcessComplete(msgData);
-			} else if (msgData.message == "computedPTC") {
-				this._handleComputedPTC(msgData);
+			switch (msgData.message) {
+				case "visitProcessComplete":
+					this._handleVisitProcessComplete(msgData);
+					break;
+				case "computedPTC":
+					this._handleComputedPTC(msgData);
+					break;
+				case "titleAnalyzed":
+					this._handleAnalyzedTitle(msgData);
+					break;
 			}
 		} else if (eventType == "error") {
 			//TODO:handle error
@@ -270,35 +307,31 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 				payload: {
 					"visit": nextVisit,
 					"timestamp": this.meta['timestamp'],
-					"start": this._start,
-					"end": this._end,
-					"domain_titles": this._domain_titles,
 					"qv": this._qv
 				}
 			});
-		} catch (ex
-			if ex instanceof StopIteration) {
+		} catch (ex if ex instanceof StopIteration) {
 			if (verbose) console.log("Total history items loaded: " + this._history_total);
 			if (verbose) console.log("Finding common suffixes in " + Object.keys(this._domain_titles).length + " domains ");
 
 			this._worker.postMessage({
 				command: "computePTC",
 				payload: {
-					"domain_titles": this._domain_titles
+					"domain_titles": this._domain_titles,
 				}
 			});
 		}
 	};
 
 	this.scan = function(start, end) {
-		this._history = getHistory();
+		this._history = getHistory(start, end);
 		this._history_total = 0;
 		this._start = start;
 		this._end = end;
 		this._qv = {}; //query variables
 		this._ptc = {}; //persistent title components
 		this._domain_titles = {};
-		this._msgReceivedCount = 0;
+		this._totalTitles = 0;
 		this._processNextHistoryEvent(start, end);
 	}
 
@@ -309,7 +342,7 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 			let decoder = new TextDecoder();
 
 			/////////DEBUGGING
-			meta_location = OS.Path.join(OS.Constants.Path.profileDir, "meta.json")
+			let meta_location = OS.Path.join(OS.Constants.Path.profileDir, "meta.json");
 			console.log("Meta should be stored at: " + meta_location)
 
 			let meta_exists =
@@ -380,7 +413,7 @@ function ComponentDatabase(worker, callback, create_objects = true) {
 function removePersistentTitleChunks(url, title, cdb) {
 	//Removes common title endings such as " - Google Search" using the component database
 
-	domain = getDomain(url)
+	let domain = getDomain(url)
 	if (cdb.hasOwnProperty(domain)) {
 		for (let suffix of cdb[domain]) {
 			if (title.toLowerCase().endsWith(suffix.toLowerCase())) {
@@ -401,8 +434,8 @@ function removeDomainNames(url, title) {
 	url = url.host.split(".")
 	title = title.toLowerCase().match(wordFinder)
 
-	new_title = []
-	removed = []
+	let new_title = []
+	let removed = []
 
 	for (let token of title) {
 		if (url.indexOf(token) == -1) {
@@ -430,7 +463,7 @@ function getURLChunks(url) {
 	url = url.match(wordFinder)
 	if (verbose) console.log('url chunks found in word finder: ' + url)
 
-	useful_words = []
+	let useful_words = []
 	for (let word of url) {
 		if (word in mozcat_words) {
 			useful_words.push(word)
@@ -533,7 +566,7 @@ function ClassificationEngine(world = false) {
 		title = title.toLowerCase().match(wordFinder)
 		let matches = []
 
-		articles = {} // a set of articles worth looking at, auto-deduped
+		let articles = {} // a set of articles worth looking at, auto-deduped
 
 		for (let keyword of title) {
 			if (this.inverse_index.hasOwnProperty(keyword)) {
@@ -548,7 +581,7 @@ function ClassificationEngine(world = false) {
 		for (let article_number in articles) {
 			let category = this.id_to_article[article_number]
 			let words = payload[category]
-			similarity = cosineSimilarity(title, words, this.magnitudes[article_number])
+			let similarity = cosineSimilarity(title, words, this.magnitudes[article_number])
 			if (similarity != 0) {
 				scores.push([category, similarity])
 			}
@@ -595,7 +628,7 @@ function augmentDomainMatchers(url, title, results) {
 	// matching word lemmas/stems
 
 	//typically anything called society or reference is a bad classification
-	ignore = {
+	let ignore = {
 		'society': true,
 		'reference': true,
 		'uncategorized': true,
@@ -603,7 +636,7 @@ function augmentDomainMatchers(url, title, results) {
 		'marketing': true,
 	}
 
-	class_maps = {
+	let class_maps = {
 		'history': ['histor'],
 		'sports': ['sport', 'gam'],
 		'computers': ['comput', 'tech', 'algorithm', 'model'],
@@ -670,7 +703,7 @@ function augmentDomainMatchers(url, title, results) {
 
 	domain = url.host.split(".")
 	for (let dot_count in domain) {
-		key = domain.slice(dot_count).join(".")
+		let key = domain.slice(dot_count).join(".")
 		if (domainRules.hasOwnProperty(key)) {
 			//found an entry in domainRules
 
@@ -687,15 +720,15 @@ function augmentDomainMatchers(url, title, results) {
 			//		"tag nintendowiiu" : "video-games"
 			//	 },
 
-			category_matchers = domainRules[key]
-			decision = false
-			keys = Object.keys(category_matchers).sort()
+			let category_matchers = domainRules[key]
+			let decision = false
+			let keys = Object.keys(category_matchers).sort()
 
 			//iterate through all keys, __ANY comes last to see if one matches
 			for (let k in Object.keys(category_matchers)) {
 				if (k != "__ANY") {
-					tokens = k.split(" ")
-					match_count = 0
+					let tokens = k.split(" ")
+					let match_count = 0
 
 					for (let token of tokens) {
 						if (title.indexOf(token) != -1) {
@@ -753,7 +786,7 @@ function augmentQueries(url, results, queryDatabase) {
 
 	if (verbose) console.log("URL: " + url)
 
-	queries = [] //a list of strings
+	let queries = [] //a list of strings
 	url = parseUri(url) //
 
 	if (queryDatabase.hasOwnProperty(url.host)) { //if the domain is in the db
@@ -878,19 +911,15 @@ function convertWikiToIAB(results, level = "top") {
 
 // Auxiliary functions, matchers, options etc
 
-const {
-	data
-} = require("sdk/self"); //not quite sure why this is necessary
-let {
-	TextEncoder, TextDecoder, OS
-} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
+const {data} = require("sdk/self"); //not quite sure why this is necessary
+let {TextEncoder, TextDecoder, OS} = Cu.import("resource://gre/modules/osfile.jsm", {}); //for file IO
 let historyService = Cc["@mozilla.org/browser/nav-history-service;1"].getService(Ci.nsINavHistoryService);
 let scriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
 scriptLoader.loadSubScript(data.url("domainRules.json"));
-scriptLoader.loadSubScript(data.url("payload.json")); //TODO: combine payload and mapping
 scriptLoader.loadSubScript(data.url("new_mappings.json"));
 scriptLoader.loadSubScript(data.url("mozcat_heirarchy.json"));
 scriptLoader.loadSubScript(data.url("mozcat_words.json"));
+let payload = JSON.parse(data.load("payload.json"));
 
 function getDomain(url) {
 	//returns the (sub)domain of a url
@@ -909,7 +938,7 @@ function getDomain(url) {
 	return url
 }
 
-function getHistory() {
+function getHistory(start, end) {
 	//Generator that yields the most recent history urls one by one
 	//Returned in the form [url, title, timestamp]
 
@@ -917,6 +946,8 @@ function getHistory() {
 	let options = historyService.getNewQueryOptions();
 	options.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_DATE_DESCENDING;
 	let query = historyService.getNewQuery();
+	query.beginTime = start;
+	query.endTime = end;
 	let result = historyService.executeQuery(query, options);
 
 	//open up the results
@@ -926,7 +957,7 @@ function getHistory() {
 	//yield whatever there is
 	for (let i = 0; i < cont.childCount; i++) {
 		let node = cont.getChild(i);
-		yield [node.uri, node.title, node.time];
+		yield [node.uri, node.title, node.time, cont.childCount];
 	}
 
 	//close the results container
