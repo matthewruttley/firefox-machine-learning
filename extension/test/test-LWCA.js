@@ -10,11 +10,16 @@ scriptLoader.loadSubScript(data.url("test/edRules_docs.js"));
 
 let useWhiteList = false;
 let whiteList = {
-  "sports": true,
+  "hobbies & interests": true,
+  //"sports": true,
+  //"politics": true,
 };
 
 let useUrlSplitting = false;
 let urlSplitPattern = /[\/-]/;
+
+let outputSingleDoc = false;
+let outputSubSet = false;
 
 function testVisit(visit, doFulleTest=false) {
   if (!visit || !visit[0] || !visit[1]) return null;
@@ -24,26 +29,66 @@ function testVisit(visit, doFulleTest=false) {
   if (useUrlSplitting) {
     urlParts = visit[0].split(urlSplitPattern).join(" ");
   }
-  titleCat = classifier.classify(visit[0], urlParts + visit[1]);
+  titleCat = classifier.classify(visit[0], urlParts + visit[1])[0];
   if (doFulleTest) {
-    fulltextCat = classifier.classify(visit[0], urlParts + visit[1] + " " + visit[2]);
+    fulltextCat = classifier.classify(visit[0], urlParts + visit[1] + " " + visit[2])[0];
   }
   return [titleCat, fulltextCat];
 }
 
-function testVisits(visits, ftLen=20) {
+function testVisits(visits, expectedCat, overall, ftLen=20) {
    let titleResults = {};
    let fullTextResults = {};
    let fullTextCount = 0;
    let len = visits.length;
+   if (!overall[expectedCat]) {
+     overall[expectedCat] = {
+      titles: {
+          total: 0,
+          correct: 0,
+          missed: 0,
+          errors: 0
+        },
+        fullText: {
+          total: 0,
+          correct: 0,
+          missed: 0,
+          errors: 0
+        }
+     };
+   }
    for (let visit of visits) {
     let results = testVisit(visit, fullTextCount < ftLen);
     if (results) {
       titleResults[results[0]] = (titleResults[results[0]] || 0) + 1;
+      overall[expectedCat].titles.total ++;
+      if (results[0] == expectedCat) {
+        overall[expectedCat].titles.correct++;
+      }
+      else if( results[0] == "uncategorized") {
+        overall[expectedCat].titles.missed++;
+      }
+      else {
+        overall[expectedCat].titles.errors++;
+      }
+
       if (fullTextCount < ftLen) {
         fullTextResults[results[1]] = (fullTextResults[results[1]] || 0) + 1;
         fullTextCount++;
+          overall[expectedCat].fullText.total ++;
+          if (results[1] == expectedCat) {
+            overall[expectedCat].fullText.correct++;
+          }
+          else if( results[1] == "uncategorized") {
+            overall[expectedCat].fullText.missed++;
+          }
+          else {
+            overall[expectedCat].fullText.errors++;
+          }
       }
+    }
+    if (outputSingleDoc && results) {
+      dump("doc:" + expectedCat + "," + results[0]  + "," + visit[1] + "," + visit[0] + "\n");
     }
    }
    Object.keys(titleResults).forEach(cat => {
@@ -82,8 +127,49 @@ function outputCatResults(results, catName, expectedCat) {
   dump("\n");
 }
 
+function computeParams(statsObj) {
+  statsObj.prec = (statsObj.correct + statsObj.errors) ? Math.round(statsObj.correct * 100 / (statsObj.correct + statsObj.errors)) : 0;
+  statsObj.recall = Math.round(statsObj.correct * 100 / statsObj.total);
+}
+
+function outputOverallResults(overall) {
+  // compute pres
+  Object.keys(overall).forEach(cat => {
+    computeParams(overall[cat].titles);
+    computeParams(overall[cat].fullText);
+  });
+
+  // sort by pres
+  var orderedCats = Object.keys(overall).sort((a,b) => {
+    return overall[b].titles.prec - overall[a].titles.prec;
+  });
+
+  // print it and compute average while going
+  var total = 0;
+  var titlePrec = 0;
+  var titleRecall = 0;
+  var ftPrec = 0;
+  var ftRecall = 0;
+  orderedCats.forEach(cat => {
+    dump(cat + "," + overall[cat].titles.prec + "," +
+         overall[cat].titles.recall + "," + overall[cat].fullText.prec + "," +
+         overall[cat].fullText.recall + "\n");
+     total ++;
+     titlePrec += overall[cat].titles.prec;
+     titleRecall += overall[cat].titles.recall;
+     ftPrec += overall[cat].fullText.prec;
+     ftRecall += overall[cat].fullText.recall;
+  });
+
+  dump("Avarage Perfromance," + Math.fround(titlePrec/total) + "," +
+       Math.fround(titleRecall/total) + "," +
+       Math.fround(ftPrec/total) + "," +
+       Math.fround(ftRecall/total) + "\n");
+}
+
 function procTestSet(testSet, name, ftLen=20) {
   dump("TEST SET: " + name + "\n");
+  let overall = {};
   Object.keys(testSet).forEach(cat => {
     let obj = testSet[cat];
     if (obj instanceof Array) {
@@ -91,16 +177,17 @@ function procTestSet(testSet, name, ftLen=20) {
     else {
       if (useWhiteList) {
         if (whiteList[obj.expectedCat]) {
-          let results = testVisits(obj.visits, ftLen);
-          outputCatResults(results, obj.name, obj.expectedCat);
+          let results = testVisits(obj.visits, obj.expectedCat, overall, ftLen);
+          if (outputSubSet) outputCatResults(results, obj.name, obj.expectedCat);
         }
       }
       else {
-       let results = testVisits(obj.visits, ftLen);
-       outputCatResults(results, obj.name, obj.expectedCat);
+       let results = testVisits(obj.visits, obj.expectedCat, overall, ftLen);
+       if (outputSubSet) outputCatResults(results, obj.name, obj.expectedCat);
       }
     }
   });
+  outputOverallResults(overall);
 }
 
 let classifier = null;
